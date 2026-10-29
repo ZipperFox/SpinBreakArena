@@ -1,0 +1,11 @@
+.git
+.gitignore
+node_modules
+*.zip
+README_ZH.md
+test_*.js
+balance_check.js
+verify_live.js
+start_*.bat
+start_*.ps1
+start_*.sh

@@ -1,0 +1,25 @@
+{
+  "name": "SPIN//BREAK ARENA · 戰鬥陀螺競技場",
+  "short_name": "SPIN BREAK",
+  "description": "多人即時連線陀螺遊戲",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#070a15",
+  "theme_color": "#070a15",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

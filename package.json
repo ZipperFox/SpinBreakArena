@@ -1,0 +1,16 @@
+{
+  "name": "spin-break-arena",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Zero-dependency multiplayer battle spinning tops web game",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test_multiplayer.js",
+    "test:remote": "node test_remote_v2.js",
+    "balance": "node balance_check.js 1000",
+    "verify:live": "node verify_live.js"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

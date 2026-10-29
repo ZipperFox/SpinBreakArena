@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover" />
+  <meta name="theme-color" content="#070a15" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="SPIN BREAK" />
+  <link rel="apple-touch-icon" href="/icon-192.png" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="description" content="SPIN//BREAK ARENA：免費的即時多人戰鬥陀螺競技遊戲，12 款陀螺、5 大競技場、必殺技與房間對戰。" />
+  <title>SPIN//BREAK ARENA | 戰鬥陀螺競技場</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/style.css" />
+  <script src="/client.js" defer></script>
+</head>
+<body>
+  <div class="background-fx" aria-hidden="true"></div>
+  <header class="site-header">
+    <div class="brand"><div class="brand-mark"><span class="mark-disc"></span><span class="mark-core"></span></div><div><div class="brand-title">SPIN<span>//</span>BREAK</div><div class="brand-sub">ARENA · 次世代陀螺競技</div></div></div>
+    <div class="header-right"><div class="live-tag"><span class="live-dot" id="netDot"></span><span id="netState">正在連線</span></div><button id="btnSound" class="icon-btn" title="切換音效與節奏音樂">♫ <span id="soundText">音效關</span></button><span class="version">V2.0 · ONLINE</span></div>
+  </header>
+  <div class="marquee"><div class="marquee-inner"><span>IGNITE YOUR SPIRIT <b>✦</b> 超越極限的碰撞 <b>✦</b> 12 種戰鬥核心 <b>✦</b> 5 大決戰舞台 <b>✦</b> <strong>LET IT RIP</strong> <b>✦</b> 引爆你的鬥志 <b>✦</b> </span><span aria-hidden="true">IGNITE YOUR SPIRIT <b>✦</b> 超越極限的碰撞 <b>✦</b> 12 種戰鬥核心 <b>✦</b> 5 大決戰舞台 <b>✦</b> <strong>LET IT RIP</strong> <b>✦</b> 引爆你的鬥志 <b>✦</b> </span></div></div>
+  <main class="layout">
+    <aside class="left-col">
+      <div class="section-heading"><div><div class="eyebrow">01 / YOUR WEAPON</div><h2>選擇戰鬥陀螺</h2></div><span class="micro-num">12 TYPES</span></div>
+      <div class="type-filters" id="typeFilters"><button class="filter active" data-filter="全部">全部</button><button class="filter" data-filter="攻擊">攻擊</button><button class="filter" data-filter="防禦">防禦</button><button class="filter" data-filter="速度">速度</button><button class="filter" data-filter="平衡">平衡</button></div>
+      <div class="roster" id="roster"><div class="loading-text">載入戰鬥裝備中…</div></div>
+      <div class="selected-profile" id="profile">
+        <div class="profile-heading"><span>SELECTED CORE</span><span id="topType">—</span></div>
+        <div class="selected-art" id="bigTop"><div class="fallback-spin"></div></div>
+        <h3 id="topName">選擇陀螺</h3><div class="ability" id="topSkill">—</div>
+        <div class="stats" id="topStats"></div>
+        <div class="balance-foot"><span>戰力總點數</span><strong id="statTotal">20 / 20</strong></div>
+      </div>
+    </aside>
+    <section class="stage-col">
+      <div class="stage-header"><div><div class="eyebrow">LIVE COMBAT FEED / 實況戰鬥</div><div class="stage-title" id="stageTitle">王者競技場 <span>· COLOSSEUM</span></div></div><div class="stage-timer"><span id="roundState">STANDBY</span><strong id="gameTimer">01:35</strong></div></div>
+      <div class="stage-frame" id="stageFrame">
+        <canvas id="stage" width="1000" height="740" aria-label="戰鬥陀螺競技場畫面"></canvas>
+        <div class="corner-mark tl"></div><div class="corner-mark tr"></div><div class="corner-mark bl"></div><div class="corner-mark br"></div>
+        <div class="stage-top-fighters" id="fightHud"></div>
+        <div class="center-overlay" id="centerOverlay"><div class="overlay-label">SPIN//BREAK ARENA</div><div class="overlay-heading">準備好<br/><em>燃燒鬥志</em>了嗎？</div><div class="overlay-sub">建立房間即可與 AI 對戰，或邀請朋友加入 2～4 人競技</div><button id="overlayPlay" class="primary-btn big-btn">立即開始對戰 <span>↗</span></button></div>
+        <div class="impact-banner" id="impactBanner"></div>
+        <div class="event-toast" id="eventToast"></div>
+        <div class="touch-controller" id="touchController"><div class="virtual-joystick" id="joyZone"><div class="joy-ring"></div><div class="joy-stick" id="joyKnob"></div><span>移動</span></div><div class="touch-actions"><button class="touch-burst" id="touchBurst">爆裂 <small>BURST</small></button><button class="touch-guard" id="touchGuard">防禦 <small>GUARD</small></button></div></div>
+      </div>
+      <div class="stage-foot"><div class="controls-keyboard"><span class="control-caption">操作方式</span><div class="key-group"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>移動</span></div><div class="key-group"><kbd>J</kbd><span>必殺技</span></div><div class="key-group"><kbd>SPACE</kbd><span>防禦</span></div></div><div class="battle-tip">利用速度獲得撞擊優勢，小心競技場邊緣！</div></div>
+      <div class="bottom-strap"><div class="strap-number">12<span>款獨特陀螺</span></div><div class="strap-divider"></div><div class="strap-number">05<span>座特殊競技場</span></div><div class="strap-divider"></div><div class="strap-number">04<span>人即時混戰</span></div><div class="strap-divider"></div><div class="strap-word">NO LIMITS. ONLY VICTORY.</div></div>
+    </section>
+    <aside class="right-col">
+      <div class="section-heading"><div><div class="eyebrow">02 / ONLINE BATTLE</div><h2>多人連線大廳</h2></div></div>
+      <div class="panel room-panel">
+        <div class="panel-kicker">PLAYER IDENTITY / 玩家資訊</div>
+        <label class="field-label" for="playerName">暱稱</label><input id="playerName" maxlength="16" autocomplete="off" value="挑戰者" placeholder="輸入你的戰鬥名稱" />
+        <button class="primary-btn" id="btnCreate">一鍵建立房間 <span>＋</span></button>
+        <div class="or-line"><span>或使用房間代碼加入</span></div>
+        <div class="join-row"><input id="roomInput" maxlength="5" autocapitalize="characters" placeholder="例如：AB3CD" aria-label="房間代碼"/><button id="btnJoin" class="secondary-btn">加入</button></div>
+        <div class="room-message" id="roomMessage">不需註冊。用手機「分享邀請」傳網址，朋友一鍵加入。公開網址須先部署或啟用臨時連線。</div>
+      </div>
+      <div class="panel lobby-panel" id="lobbyPanel">
+        <div class="lobby-title"><div><div class="panel-kicker">BATTLE LOBBY</div><h3 id="lobbyHeading">尚未加入房間</h3></div><span class="lobby-status" id="lobbyStatus">WAITING</span></div>
+        <div class="room-code-row"><div><small>房間邀請代碼</small><strong id="roomCode">-----</strong></div><div class="share-actions"><button class="copy-btn" id="btnCopy" title="複製邀請連結">複製連結</button><button class="share-btn" id="btnShare" title="使用手機的分享選單邀請朋友" disabled>分享邀請</button></div></div>
+        <div class="participant-list" id="participants"><div class="placeholder-person">◎ 建立房間，準備開戰</div></div>
+        <div class="arena-picker"><label class="field-label" for="arenaSelect">決戰場地 / ARENA</label><select id="arenaSelect" disabled><option>王者競技場</option></select><div class="arena-description" id="arenaDescription">每座競技場都有不同的戰鬥規則。</div></div>
+        <div class="bots-picker"><div><label class="field-label" for="botCount">電腦對手 / AI RIVALS</label><small>可單人練習，最多 4 人同場</small></div><select id="botCount" disabled><option value="1">1 位</option></select></div>
+        <button class="start-btn" id="btnStart" disabled>LET IT RIP! <small>開始戰鬥</small><span>➤</span></button>
+        <button class="secondary-btn full hidden" id="btnAgain">重新選角 / 再戰一場</button>
+        <button class="leave-btn hidden" id="btnLeave">離開房間</button>
+      </div>
+      <div class="panel mobile-help"><strong>手機快速開戰</strong><p>① 開房 → ② 分享邀請 → ③ 朋友點連結 → ④ 房主開戰。可在 Safari 使用「加入主畫面」建立捷徑。</p></div>
+      <div class="panel live-panel"><div class="panel-kicker">COMBAT TELEMETRY / 戰鬥情報</div><div class="scoreboard" id="scoreboard"><span class="placeholder-person">等待戰鬥開始</span></div></div>
+      <div class="panel event-panel"><div class="panel-kicker">BATTLE LOG / 即時戰況</div><div class="combat-log" id="combatLog"><div class="log-empty">能量正在聚集…</div></div></div>
+    </aside>
+  </main>
+  <footer class="footer"><div>SPIN//BREAK ARENA · 原創網頁戰鬥陀螺競技</div><div>伺服器同步 · 房間配對 · 無需遊戲帳號</div></footer>
+</body>
+</html>
