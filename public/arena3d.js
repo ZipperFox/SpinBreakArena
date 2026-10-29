@@ -67,99 +67,132 @@ function createStage(name){battleground.clear();stageName=name;
  const middle=mesh(new THREE.CylinderGeometry(1.16,1.16,.015,40),new THREE.MeshBasicMaterial({color:hot,transparent:true,opacity:.06}),battleground);middle.position.y=.029;
 }
 const models=new Map(),effects=[];
-// V9.3: layered, toy-proportioned spinning top visual models. Rapier remains unchanged.
+// V9.3 visual-only redesign: game-scale layered mechanical spinning tops.
+// Keep every mesh inside the original ~0.5 m collision footprint; Rapier remains authoritative.
 function buildTop(top,parts={}){
- const main=parts.paint||top.color||'#ff7355',accent=top.accent||'#ffe8ab';
+ const main=parts.paint||top.color||'#ff7355', accent=top.accent||'#ffe8ab';
  const root=new THREE.Group();root.userData.fighterId=null;
  const bladePart=new THREE.Group(),ratchetPart=new THREE.Group(),bitPart=new THREE.Group();
- root.add(bladePart,ratchetPart,bitPart);root.userData.assemblies={bladePart,ratchetPart,bitPart};
+ root.add(bladePart,ratchetPart,bitPart);
+ root.userData.assemblies={bladePart,ratchetPart,bitPart};
  const form=top.blade||{lobes:5,reach:.40,tip:.12,shape:'wave'};
  const count=Math.max(2,form.lobes||5),shape=form.shape||'wave';
- const armor=mat('#243141',.83,.28),dark=mat('#101723',.66,.40);
- const steel=mat('#c1cad8',.84,.25),bright=mat('#eff7ff',.76,.22);
- const color=mat(main,.61,.28,main,.14),line=mat(accent,.70,.24,accent,.26);
- const rubber=mat('#1d2430',.05,.83);
- const make=(g,m,parent,x=0,y=0,z=0)=>{const o=mesh(g,m,parent);o.position.set(x,y,z);o.castShadow=!mobile;return o;};
- const cyl=(a,b,h,m,parent,y,n=40)=>make(new THREE.CylinderGeometry(a,b,h,n),m,parent,0,y);
- const tor=(r,t,y,m,parent=bladePart)=>{const o=make(new THREE.TorusGeometry(r,t,8,44),m,parent,0,y);o.rotation.x=Math.PI/2;return o;};
- // Thick attack ring with a genuinely different outline for each blade form.
- cyl(.347,.345,.16,armor,bladePart,.006);
- cyl(.295,.315,.055,color,bladePart,.111);
- tor(.331,.028,.121,steel);
- tor(.257,.017,.153,line);
- const amp=shape==='shield'?.053:shape==='hammer'?.09:shape==='axe'?.108:shape==='swept'?.087:shape==='talon'?.10:.068;
- const outline=new THREE.Shape(),steps=Math.max(80,count*16);
+ const armor=mat('#253041',.83,.27),dark=mat('#0f1827',.68,.38);
+ const steel=mat('#b9c5d1',.86,.25),bright=mat('#edf4ff',.78,.22);
+ const color=mat(main,.57,.29,main,.12),line=mat(accent,.67,.24,accent,.22);
+ const clear=mat(main,.42,.16,main,.47);
+ const make=(geo,m,parent,x=0,y=0,z=0)=>{const obj=mesh(geo,m,parent);obj.position.set(x,y,z);obj.castShadow=!mobile;return obj;};
+ const cyl=(a,b,h,m,parent,y,segs=48)=>make(new THREE.CylinderGeometry(a,b,h,segs),m,parent,0,y);
+ const tor=(r,t,y,m,parent=bladePart)=>{const o=make(new THREE.TorusGeometry(r,t,8,48),m,parent,0,y);o.rotation.x=Math.PI/2;return o;};
+ // The blade is a thick mechanical rotor, not an almost flat coin.
+ cyl(.350,.343,.15,armor,bladePart,.015);
+ cyl(.298,.327,.055,color,bladePart,.106);
+ tor(.331,.032,.105,steel);
+ tor(.255,.020,.143,line);
+ const amp=shape==='shield'?.053:shape==='hammer'?.092:shape==='axe'?.112:shape==='swept'?.086:shape==='talon'?.099:.069;
+ const steps=Math.max(80,count*16),profile=[];
  for(let i=0;i<steps;i++){
-  const a=2*Math.PI*i/steps,phase=(i*count/steps)%1;
+  const a=i*Math.PI*2/steps,phase=(a*count/(Math.PI*2))%1;
   let pulse;
-  if(shape==='shield')pulse=.45+.45*Math.cos(2*Math.PI*phase)**2;
-  else if(shape==='hammer')pulse=phase<.44?.94:Math.max(.1,.94-(phase-.44)*1.55);
-  else if(shape==='axe')pulse=phase<.22?.42+phase*2.6:Math.max(.07,1-(phase-.22)*1.24);
-  else if(shape==='swept')pulse=(1-phase)**.58;
-  else if(shape==='talon')pulse=phase<.78?.18+phase*1.04:Math.max(.10,1-(phase-.78)*4.1);
-  else pulse=.48+.47*Math.sin(phase*Math.PI);
-  const r=.365+amp*pulse,x=Math.cos(a)*r,z=Math.sin(a)*r;
-  if(i===0)outline.moveTo(x,z);else outline.lineTo(x,z);
- }
- outline.closePath();
- const rotor=make(new THREE.ExtrudeGeometry(outline,{depth:.115,steps:1,bevelEnabled:true,bevelSize:.012,bevelThickness:.014,bevelSegments:1}),[color,steel],bladePart,0,-.012);
- rotor.rotation.x=-Math.PI/2;
- cyl(.243,.254,.032,dark,bladePart,.160);
- tor(.245,.015,.182,steel);
- // Radial metal plates, fastening bolts and raised central lock.
- for(let i=0;i<count;i++){
-  const a=(i+.5)*2*Math.PI/count,sector=Math.min(.38,Math.PI/count*.65);
-  const plate=new THREE.Shape();const inner=.283,outer=shape==='shield'?.396:.423;
-  for(let j=0;j<=5;j++){
-   const ang=a-sector+2*sector*j/5,r=inner+(outer-inner)*j/5;
-   if(j===0)plate.moveTo(Math.cos(ang)*r,Math.sin(ang)*r);
-   else plate.lineTo(Math.cos(ang)*r,Math.sin(ang)*r);
+  switch(shape){
+   case 'shield': pulse=.45+.45*Math.pow(Math.max(0,Math.cos(phase*Math.PI*2)),2);break;
+   case 'hammer': pulse=phase<.44?.94:Math.max(.10,.94-(phase-.44)*1.55);break;
+   case 'axe': pulse=phase<.22?.42+phase*2.6:Math.max(.07,1-(phase-.22)*1.24);break;
+   case 'swept': pulse=Math.pow(1-phase,.58);break;
+   case 'talon': pulse=phase<.78?(.18+phase*1.04):Math.max(.10,1-(phase-.78)*4.1);break;
+   default: pulse=.48+.47*Math.sin(phase*Math.PI);break;
   }
-  for(let j=5;j>=0;j--){const ang=a-sector+2*sector*j/5,r=inner+.12*(outer-inner);plate.lineTo(Math.cos(ang)*r,Math.sin(ang)*r);}
-  plate.closePath();
-  const fin=make(new THREE.ExtrudeGeometry(plate,{depth:.028,bevelEnabled:true,bevelSize:.007,bevelThickness:.007,bevelSegments:1}),i%3===0?line:i%2?steel:color,bladePart,0,.146+(i%3===0?.009:0));
-  fin.rotation.x=-Math.PI/2;
-  make(new THREE.CylinderGeometry(.017,.017,.011,8),i%2?bright:dark,bladePart,Math.cos(a)*.294,.196,Math.sin(a)*.294);
+  const r=.365+amp*pulse;
+  profile.push([Math.cos(a)*r,Math.sin(a)*r]);
  }
- cyl(.203,.215,.053,steel,bladePart,.188);
- cyl(.171,.176,.037,dark,bladePart,.229);
- tor(.178,.014,.250,line);
- cyl(.129,.133,.029,color,bladePart,.263,24);
- const jewel=make(new THREE.OctahedronGeometry(.088,0),bright,bladePart,0,.289);jewel.scale.y=.27;
- for(let i=0;i<4;i++){const a=i*Math.PI/2+.45;make(new THREE.BoxGeometry(.036,.017,.074),line,bladePart,Math.cos(a)*.146,.265,Math.sin(a)*.146).rotation.y=-a;}
- // Ratchet: physically layered middle gear with visible teeth count.
+ const rotorShape=new THREE.Shape();profile.forEach(([x,z],i)=>i?rotorShape.lineTo(x,z):rotorShape.moveTo(x,z));rotorShape.closePath();
+ const rotorGeo=new THREE.ExtrudeGeometry(rotorShape,{depth:.115,steps:1,bevelEnabled:true,bevelThickness:.014,bevelSize:.012,bevelSegments:1,curveSegments:3});
+ // An extruded XY shape rotates to the world's horizontal XZ plane.
+ const rotor=make(rotorGeo,[color,steel],bladePart,0,-.012,0);rotor.rotation.x=-Math.PI/2;
+ const innerGear=cyl(.247,.254,.032,dark,bladePart,.158);
+ tor(.247,.015,.180,steel);
+ // Three-dimensional wedge armor on the upper rotor; shape and lobe count vary by blade.
+ for(let i=0;i<count;i++){
+  const a=(i+.5)*Math.PI*2/count, sector=Math.min(.39,Math.PI/count*.67);
+  const inner=.283,outer=shape==='shield'?.399:.425;
+  const plate=new THREE.Shape();
+  for(let j=0;j<=5;j++){
+   const ang=a-sector+(sector*2*j/5);
+   const r=inner+(outer-inner)*(j/5);
+   j?plate.lineTo(Math.cos(ang)*r,Math.sin(ang)*r):plate.moveTo(Math.cos(ang)*r,Math.sin(ang)*r);
+  }
+  for(let j=5;j>=0;j--){const ang=a-sector+sector*2*j/5;const r=inner+(outer-inner)*.13;plate.lineTo(Math.cos(ang)*r,Math.sin(ang)*r);}
+  plate.closePath();
+  const plateGeo=new THREE.ExtrudeGeometry(plate,{depth:.029,bevelEnabled:true,bevelSize:.007,bevelThickness:.008,bevelSegments:1,steps:1});
+  const m=make(plateGeo,i%3===0?line:i%2?steel:color,bladePart,0,.145+(i%3===0?.012:0),0);
+  m.rotation.x=-Math.PI/2;
+  const bolt=make(new THREE.CylinderGeometry(.017,.017,.010,8),i%2?bright:dark,bladePart,Math.cos(a)*.295,.194,Math.sin(a)*.295);
+ }
+ // Raised center cap / locking assembly: clearly a spinning top from any camera angle.
+ cyl(.203,.215,.052,steel,bladePart,.189);
+ cyl(.173,.177,.035,dark,bladePart,.228);
+ tor(.178,.015,.250,line);
+ const emblem=cyl(.128,.130,.030,color,bladePart,.260,24);
+ const symbol=make(new THREE.OctahedronGeometry(.088,0),bright,bladePart,0,.288,0);symbol.scale.y=.28;
+ for(let i=0;i<4;i++){
+  const a=i*Math.PI/2+.45;
+  make(new THREE.BoxGeometry(.035,.018,.075),line,bladePart,Math.cos(a)*.146,.265,Math.sin(a)*.146).rotation.y=-a;
+ }
+ // Ratchet looks like a second removable gear, with an obvious steel waist.
  const ratchet=parts.ratchet||'wide7';
  const gears={low3:3,heavy5:5,wide7:7,tall4:4,dense9:9,swift2:2};
- const countGear=gears[ratchet]||7,heavy=ratchet==='heavy5'||ratchet==='dense9';
+ const gear=gears[ratchet]||7,heavy=ratchet==='heavy5'||ratchet==='dense9';
  const width=heavy?.270:ratchet==='swift2'?.225:.246;
- cyl(width,width*.92,.115,armor,ratchetPart,-.148,32);
+ cyl(width,width*.93,.115,armor,ratchetPart,-.148,32);
  cyl(.180,.171,.061,steel,ratchetPart,-.217,32);
- for(let i=0;i<countGear;i++){
-  const a=2*Math.PI*i/countGear;
-  const tooth=make(new THREE.BoxGeometry(heavy?.089:.070,.098,heavy?.096:.066),i%2?color:steel,ratchetPart,Math.cos(a)*(width-.018),-.154,Math.sin(a)*(width-.018));
-  tooth.rotation.y=-a;
+ const ratMat=heavy?steel:color;
+ for(let j=0;j<gear;j++){
+  const a=2*Math.PI*j/gear;
+  const t=make(new THREE.BoxGeometry(heavy?.091:.072,.100,heavy?.097:.066),j%2?ratMat:steel,ratchetPart,
+   Math.cos(a)*(width-.016),-.154,Math.sin(a)*(width-.016));t.rotation.y=-a;
  }
- tor(.19,.014,-.084,line,ratchetPart);
- // Bit: recognizable tip shape for each of the eight interchangeable axle types.
- const bit=parts.bit||'taper',bitMat=bit==='rubber'?rubber:color;
- cyl(.134,.120,.08,steel,bitPart,-.264,32);
- cyl(.110,.101,.056,dark,bitPart,-.307,32);
- const cone=(a,b,h,y,m)=>cyl(a,b,h,m,bitPart,y,28);
- if(bit==='flat'){cone(.105,.124,.081,-.353,bitMat);cone(.123,.123,.018,-.392,rubber);}
- else if(bit==='rush'){cone(.112,.091,.088,-.356,bitMat);for(let i=0;i<6;i++){const a=i*Math.PI/3;const t=make(new THREE.BoxGeometry(.03,.04,.04),steel,bitPart,Math.cos(a)*.112,-.361,Math.sin(a)*.112);t.rotation.y=-a;}cone(.092,.09,.018,-.400,steel);}
- else if(bit==='ball'){cone(.107,.09,.049,-.344,bitMat);make(new THREE.SphereGeometry(.089,18,12),steel,bitPart,0,-.352);}
- else if(bit==='needle'){cone(.104,.054,.071,-.345,bitMat);cone(.055,.009,.096,-.387,steel);}
- else if(bit==='orbit'){cone(.105,.092,.066,-.344,bitMat);tor(.094,.022,-.369,steel,bitPart);make(new THREE.SphereGeometry(.073,16,12),line,bitPart,0,-.372);}
- else if(bit==='gear'){cone(.117,.087,.088,-.352,bitMat);for(let i=0;i<8;i++){const a=i*Math.PI/4;const t=make(new THREE.BoxGeometry(.027,.052,.03),steel,bitPart,Math.cos(a)*.105,-.362,Math.sin(a)*.105);t.rotation.y=-a;}cone(.079,.055,.039,-.41,steel);}
- else if(bit==='rubber'){cone(.115,.131,.093,-.358,rubber);cone(.129,.129,.028,-.402,bitMat);}
- else{cone(.114,.047,.124,-.36,bitMat);make(new THREE.SphereGeometry(.031,12,8),steel,bitPart,0,-.416);}
+ const ratMark=make(new THREE.TorusGeometry(.190,.014,6,36),line,ratchetPart,0,-.085,0);ratMark.rotation.x=Math.PI/2;
+ // The bit is a real distinct interchangeable shaft/tip, not a tiny glowing ball.
+ const bit=parts.bit||'taper';
+ const rubber=mat('#17212d',.1,.86),bitMat=bit==='rubber'?rubber:color;
+ cyl(.134,.119,.080,steel,bitPart,-.264,32);
+ cyl(.110,.101,.055,dark,bitPart,-.306,32);
+ const cone=(rt,rb,h,y,m,seg=28)=>cyl(rt,rb,h,m,bitPart,y,seg);
+ if(bit==='flat'){
+  cone(.103,.124,.079,-.353,bitMat);cone(.123,.123,.018,-.393,rubber);
+ }else if(bit==='rush'){
+  cone(.112,.090,.088,-.355,bitMat);
+  for(let i=0;i<6;i++){const a=i*Math.PI/3;const t=make(new THREE.BoxGeometry(.029,.040,.039),steel,bitPart,Math.cos(a)*.112,-.363,Math.sin(a)*.112);t.rotation.y=-a;}
+  cone(.092,.091,.018,-.402,steel);
+ }else if(bit==='ball'){
+  cone(.107,.092,.049,-.343,bitMat);
+  make(new THREE.SphereGeometry(.089,18,12),steel,bitPart,0,-.352,0);
+ }else if(bit==='needle'){
+  cone(.104,.053,.073,-.345,bitMat);
+  cone(.056,.009,.096,-.386,steel);
+ }else if(bit==='orbit'){
+  cone(.105,.092,.066,-.343,bitMat);
+  const collar=make(new THREE.TorusGeometry(.093,.022,6,24),steel,bitPart,0,-.368,0);collar.rotation.x=Math.PI/2;
+  make(new THREE.SphereGeometry(.072,16,12),line,bitPart,0,-.372,0);
+ }else if(bit==='gear'){
+  cone(.117,.087,.088,-.352,bitMat);
+  for(let i=0;i<8;i++){const a=i*Math.PI/4;const t=make(new THREE.BoxGeometry(.027,.053,.030),steel,bitPart,Math.cos(a)*.105,-.362,Math.sin(a)*.105);t.rotation.y=-a;}
+  cone(.079,.055,.039,-.411,steel);
+ }else if(bit==='rubber'){
+  cone(.115,.131,.094,-.358,rubber);
+  cone(.129,.129,.027,-.402,bitMat);
+ }else{
+  // Taper: clearly conical pivot with a small spherical contact foot.
+  cone(.114,.047,.124,-.359,bitMat);
+  make(new THREE.SphereGeometry(.031,12,8),steel,bitPart,0,-.417,0);
+ }
  return root;
 }
-// Garage uses the same visual parts as combat; Rapier keeps simplified rigid-body colliders.
+// Garage preview uses the same procedural artwork as battle; Rapier colliders remain simplified for performance.
 const garageCanvas=document.getElementById('garage3d');
 let garageRenderer=null,garagePreview=null,garageKey='';const garageScene=new THREE.Scene();
 garageScene.background=new THREE.Color('#091321');
-const garageCamera=new THREE.PerspectiveCamera(35,1,.1,30);garageCamera.position.set(1.76,1.4,2.46);garageCamera.lookAt(0,0,0);
+const garageCamera=new THREE.PerspectiveCamera(35,1,.1,30);garageCamera.position.set(1.76,1.40,2.46);garageCamera.lookAt(0,0,0);
 garageScene.add(new THREE.HemisphereLight('#d8f3ff','#1b263a',2.6));
 const glight=new THREE.DirectionalLight('#ffcc9c',5);glight.position.set(-2,5,4);garageScene.add(glight);
 function updateGarage(state){
@@ -208,12 +241,56 @@ surface.addEventListener('pointerup',e=>{if(!pointerStart)return;const moved=Mat
  const first=projector.intersectObjects(meshes,false)[0];if(!first)return;let obj=first.object;while(obj&&!obj.userData.fighterId)obj=obj.parent;
  if(obj?.userData.fighterId)window.SPINBREAK_3D_BRIDGE?.setTarget(obj.userData.fighterId);
 });
+// V10 synchronized anomaly displays; all physics comes from authoritative snapshots.
+const anomalyOverlay=new THREE.Group();scene.add(anomalyOverlay);
+let anomalyKind='',anomalyPhase='';
+const debrisMeshes=new Map();
+function anomalyMesh(g,m,x=0,y=.08,z=0){const o=new THREE.Mesh(g,m);o.position.set(x,y,z);anomalyOverlay.add(o);return o;}
+function rebuildAnomaly(a){
+ for(const o of [...anomalyOverlay.children]){anomalyOverlay.remove(o);o.geometry?.dispose();o.material?.dispose();}
+ anomalyKind=a?.kind||'';anomalyPhase=a?.phase||'';
+ if(!anomalyKind||anomalyPhase==='idle')return;
+ const warn=a.phase==='warning';
+ const c={blackhole:0xbd72ff,meteor:0xff6644,cyclone:0x5cf4df,magnet:0x62aaff,shockwave:0xffce73}[a.kind]||0xffffff;
+ const mat=new THREE.MeshBasicMaterial({color:c,transparent:true,opacity:warn?.40:.72,depthWrite:false,side:THREE.DoubleSide});
+ const ring=anomalyMesh(new THREE.TorusGeometry(a.kind==='blackhole'?2.4:2.0,.06,8,96),mat.clone(),a.x,.08,a.z);
+ ring.rotation.x=Math.PI/2;ring.userData.main=true;
+ if(a.kind==='blackhole'){
+   const core=anomalyMesh(new THREE.SphereGeometry(.29,20,12),new THREE.MeshBasicMaterial({color:0x100c28}),a.x,.39,a.z);core.userData.core=true;
+   const disc=anomalyMesh(new THREE.TorusGeometry(.48,.065,8,42),mat.clone(),a.x,.31,a.z);disc.rotation.x=Math.PI/2;disc.userData.disc=true;
+ }else if(a.kind==='magnet'){
+   for(let i=0;i<2;i++){const orb=anomalyMesh(new THREE.SphereGeometry(.17,10,9),mat.clone(),a.x+(i?1.35:-1.35),.35,a.z);orb.userData.orb=true;}
+ }else if(a.kind==='shockwave')ring.userData.wave=true;
+}
+function updateAnomaly3D(s,dt){
+ const a=s?.anomaly||{};
+ if((a.kind||'')!==anomalyKind||(a.phase||'')!==anomalyPhase)rebuildAnomaly(a);
+ const tick=s?.time||0;
+ for(const o of anomalyOverlay.children){
+   if(o.userData.main){o.scale.setScalar(1+Math.sin(tick*5)*.06);
+     if(o.userData.wave&&a.phase==='active'){const progress=1-Math.max(0,a.until-tick)/3.6;o.scale.setScalar(.35+progress*1.5);}}
+   if(o.userData.disc)o.rotation.z+=dt*2.8;
+ }
+ const hazards=new Set();
+ for(const h of s?.hazards||[]){hazards.add(h.id);let mesh=debrisMeshes.get(h.id);
+   if(!mesh){mesh=new THREE.Mesh(new THREE.DodecahedronGeometry(h.r,1),new THREE.MeshStandardMaterial({color:0xf69b57,metalness:.65,roughness:.45,emissive:0x59210d,emissiveIntensity:.42}));scene.add(mesh);debrisMeshes.set(h.id,mesh);}
+   mesh.visible=true;mesh.position.set(h.x,h.y,h.z);mesh.rotation.set(tick*2.5,h.id+tick*2,tick*1.2);
+ }
+ for(const [id,m] of debrisMeshes)if(!hazards.has(id)){scene.remove(m);m.geometry.dispose();m.material.dispose();debrisMeshes.delete(id);}
+ // Dangerous impact zones are marked before meteorite spawn.
+ if(a.kind==='meteor'&&a.phase==='warning'&&Array.isArray(a.spawns)){
+   if(anomalyOverlay.children.filter(o=>o.userData.telegraph).length===0){
+     for(const pos of a.spawns){const ring=anomalyMesh(new THREE.RingGeometry(.19,.30,24),new THREE.MeshBasicMaterial({color:0xff6447,transparent:true,opacity:.78,side:THREE.DoubleSide,depthWrite:false}),pos.x,.085,pos.z);ring.rotation.x=-Math.PI/2;ring.userData.telegraph=true;}
+   }
+ }
+}
 const targetIndicator=new THREE.Group();scene.add(targetIndicator);
 const circle=mesh(new THREE.TorusGeometry(.66,.018,6,42),new THREE.MeshBasicMaterial({color:'#ffdf86',transparent:true,opacity:.9,depthTest:false}),targetIndicator);circle.rotation.x=Math.PI/2;
 const marker=mesh(new THREE.ConeGeometry(.12,.25,4),new THREE.MeshBasicMaterial({color:'#ffe8a7',depthTest:false}),targetIndicator);marker.position.y=.65;marker.rotation.z=Math.PI;
 function loop(t){requestAnimationFrame(loop);const dt=Math.min(.05,Math.max(.001,(t-oldFrame)/1000));oldFrame=t;time+=dt;
  const state=source(),s=state.latest;const name=state.room?.arena||'colosseum';if(name!==stageName)createStage(name);
  const rect=wrapper.getBoundingClientRect(),w=Math.max(2,Math.floor(rect.width)),h=Math.max(2,Math.floor(rect.height));if(w!==baseline?.w||h!==baseline?.h){renderer.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix();baseline={w,h};}
+ updateAnomaly3D(s,dt);
  const active=new Set();const fighters=s?.fighters||[];
  for(const p of fighters){active.add(p.id);let obj=models.get(p.id);const top=state.tops?.find(t=>t.id===p.top);
    if(!obj){if(!top)continue;const group=buildTop(top,p.build);group.userData.fighterId=p.id;scene.add(group);obj={group,targetP:new THREE.Vector3(),targetQ:new THREE.Quaternion(),lastX:0,lastZ:0};models.set(p.id,obj);}
@@ -221,7 +298,7 @@ function loop(t){requestAnimationFrame(loop);const dt=Math.min(.05,Math.max(.001
    obj.targetP.set((p.x||0)/40,(p.h||0)/40,(p.y||0)/40);if(Array.isArray(p.q))obj.targetQ.set(...p.q);
    if(!obj.group.userData.init){obj.group.position.copy(obj.targetP);obj.group.quaternion.copy(obj.targetQ);obj.group.userData.init=true;}
    else{obj.group.position.lerp(obj.targetP,Math.min(1,dt*21));obj.group.quaternion.slerp(obj.targetQ,Math.min(1,dt*21));}
-   const tail=obj.group.userData.tail;if(!tail){const line=mesh(new THREE.TorusGeometry(.53,.020,6,30),mat(top?.color||'#5be2ef',.1,.7,top?.color||'#5be2ef',.8),obj.group);line.position.y=-.02;line.rotation.x=Math.PI/2;obj.group.userData.tail=line;}else tail.visible=!!p.charging||!!p.boost;
+   const tail=obj.group.userData.tail;if(!tail){const line=mesh(new THREE.TorusGeometry(.53,.020,6,30),mat(top?.color||'#5be2ef',.1,.7,top?.color||'#5be2ef',.8),obj.group);line.position.y=-.02;line.rotation.x=Math.PI/2;obj.group.userData.tail=line;}else tail.visible=!!p.charging||!!p.boost||!!p.countering;
  }
  for(const [id,obj] of models)if(!active.has(id)){scene.remove(obj.group);obj.group.traverse(o=>{if(o.isMesh){o.geometry.dispose();o.material.dispose();}});models.delete(id);}
  const activeTarget=models.get(state.targetId);targetIndicator.visible=!!(activeTarget&&s?.fighters?.find(x=>x.id===state.targetId)?.alive);

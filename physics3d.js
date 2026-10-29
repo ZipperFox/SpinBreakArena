@@ -18,6 +18,17 @@ const norm=(x,z)=>{const v=Math.max(.0001,length(x,z));return [x/v,z/v]};
 const quatAxis=q=>({x:2*(q.x*q.y-q.z*q.w),y:1-2*(q.x*q.x+q.z*q.z),z:2*(q.y*q.z+q.x*q.w)});
 const V=(x,y,z)=>({x,y,z});
 const yaw=a=>({x:0,y:Math.sin(a/2),z:0,w:Math.cos(a/2)});
+const ANOMALIES={
+ blackhole:{name:'深淵黑洞',warning:'黑洞即將形成！遠離中心或利用引力衝鋒',duration:4.6,color:'#bb79ff'},
+ meteor:{name:'隕石碎片雨',warning:'上空出現墜落警告！留意紅色落點',duration:4.4,color:'#ffae70'},
+ cyclone:{name:'極速風暴',warning:'風場正在增強！小心橫向推力',duration:5.2,color:'#68f4d2'},
+ magnet:{name:'雙極磁場',warning:'磁場即將啟動！場地中央將出現斥力',duration:4.5,color:'#7db9ff'},
+ shockwave:{name:'重力震盪',warning:'地面共振警報！短暫失衡即將發生',duration:3.6,color:'#ffdf78'}
+};
+const ANOMALY_IDS=Object.keys(ANOMALIES);
+const EVENT_RADIUS=3.7;
+const randomPoint=()=>{const a=Math.random()*TAU,r=.7+Math.sqrt(Math.random())*2.5;return {x:+(Math.cos(a)*r).toFixed(2),z:+(Math.sin(a)*r).toFixed(2)};};
+const anomalyInfo=(r)=>{const e=r.anomaly||{};return {kind:e.kind||null,phase:e.phase||'idle',name:ANOMALIES[e.kind]?.name||'',x:e.x||0,z:e.z||0,until:e.until||0,nextAt:r.nextAnomalyAt||0,spawns:e.spawns||[]};};
 const PLACES={
  colosseum:[[0,-3.2,.42],[0,3.2,.42]],
  vortex:[[-2.8,-2.35,.42],[2.8,2.35,.42],[-2.8,2.35,.38],[2.8,-2.35,.38]],
@@ -37,7 +48,7 @@ function makeEngine(tops,parts,callbacks){
   world.timestep=TICK;
   // Solver stabilization and accurate fast impact collision.
   world.numSolverIterations=10;
-  r.physics={world,queue:new R.EventQueue(true),byCollider:new Map(),guardColliders:new Set(),railColliders:new Set(),contactTimes:new Map(),rails:[],pillars:PLACES[r.arena]||PLACES.colosseum};
+  r.physics={world,queue:new R.EventQueue(true),debris:[],debrisColliders:new Set(),byCollider:new Map(),guardColliders:new Set(),railColliders:new Set(),contactTimes:new Map(),rails:[],pillars:PLACES[r.arena]||PLACES.colosseum};
   const floor=R.ColliderDesc.cuboid(8.15,.17,8.15);
   fixed(r,floor,0,-.19,0,.08,.65);
   // Tall overlapping upright cylinders, NOT low spheres. A rounded horizontal row
@@ -62,6 +73,7 @@ function makeEngine(tops,parts,callbacks){
  }
  function create(r,members){
   if(r.physics?.world)r.physics.world.free();makeArena(r);
+  r.anomaly={phase:'idle',kind:null,x:0,z:0,until:0};r.nextAnomalyAt=7+Math.random()*3;r.lastAnomaly=null;
   const membersCount=members.length;
   return members.map((p,i)=>{
    const a=TAU*i/membersCount-Math.PI/2+.48;
@@ -114,7 +126,7 @@ function makeEngine(tops,parts,callbacks){
    for(const c of contacts)r.physics.byCollider.set(c.handle,p.id);
    return {...p,x:x*U,y:z*U,h:body.translation().y*U,vx:0,vy:0,q:[0,0,0,1],body,
       initialSpin:spinRate,launchStrength:launchSpeed,spin:100,spinEnergy:100,wobble:0,alive:true,koReason:'',cool:0,chargeCd:0,
-      chargeUntil:0,boostUntil:0,fortressUntil:0,phaseUntil:0,bladeUntil:0,slowUntil:0,stunUntil:0,
+      chargeUntil:0,counterUntil:0,counterCd:0,counterCount:0,precisionCount:0,boostUntil:0,fortressUntil:0,phaseUntil:0,bladeUntil:0,slowUntil:0,stunUntil:0,
       impact:0,skillCount:0,railTimer:0,railCooldown:0,railSign:1,railAngle:0,bot:!!p.bot,
       input:{targetId:null},aiTimer:0,orbitSign:i%2?-1:1,orbitPhase:i*2.2,
       lastHit:null,lastHitAt:-100,lastHitSpeed:0,lastImpactAt:-100,chargeCount:0,flightCount:0,score:0};
@@ -143,6 +155,11 @@ function makeEngine(tops,parts,callbacks){
   p.chargeCd=4.5;p.chargeUntil=r.age+.75;p.chargeCount++;
   p.spinEnergy=Math.max(0,p.spinEnergy-3.8);
   callbacks.event(r,'charge',`${p.name} · 極限衝鋒！`,p.id,Math.round(strength*40),{x:p.x,y:p.y,targetId:q.id});return true;
+ }
+ function counter(r,p){
+  if(!p.alive||p.counterCd>0||p.spinEnergy<10||p.railTimer>0)return false;
+  p.counterUntil=r.age+.55;p.counterCd=6.8;p.spinEnergy=Math.max(0,p.spinEnergy-2.1);
+  callbacks.event(r,'counter_ready',`${p.name} · 反擊姿態！`,p.id,0,{x:p.x,y:p.y});return true;
  }
  function skill(r,p){if(!p.alive||p.cool>0||p.spin<12)return false;const t=topBy[p.top],foes=r.fighters.filter(q=>q.alive&&q.id!==p.id);
   p.cool=t.cd;p.skillCount++;
@@ -176,10 +193,64 @@ function makeEngine(tops,parts,callbacks){
   p.railTimer=.85;p.railCooldown=5.6;p.railSign=t.z<0?1:-1;
   callbacks.event(r,'rail',`${p.name} · 極限軌道加速！`,p.id,Math.round(length(v.x,v.z)*U),{x:p.x,y:p.y});
  }
+ function spawnDebris(r){
+  const phy=r.physics,world=phy.world,e=r.anomaly;
+  for(let i=0;i<5;i++){
+   const pos=e.spawns?.[i]||randomPoint(),radius=.20+(i%3)*.045;
+   const body=world.createRigidBody(R.RigidBodyDesc.dynamic().setTranslation(pos.x,3.6+i*.55,pos.z)
+     .setLinvel(0,-.7,0).setAngularDamping(.1).setCcdEnabled(true));
+   const collider=world.createCollider(R.ColliderDesc.ball(radius).setDensity(.65).setRestitution(.66)
+     .setFriction(.35).setActiveEvents(R.ActiveEvents.CONTACT_FORCE_EVENTS).setContactForceEventThreshold(.3),body);
+   phy.debrisColliders.add(collider.handle);
+   phy.debris.push({id:i,body,collider,expires:r.age+5.7,r:radius});
+  }
+ }
+ function updateAnomaly(r){
+  if(r.chaos===false||r.status!=='playing')return;
+  const e=r.anomaly;
+  if(e.phase==='idle'&&r.age>=r.nextAnomalyAt){
+    let kinds=ANOMALY_IDS.filter(k=>k!==r.lastAnomaly),kind=kinds[Math.floor(Math.random()*kinds.length)];
+    const pos=kind==='blackhole'?{x:0,z:0}:randomPoint();
+    Object.assign(e,{kind,x:pos.x,z:pos.z,spawns:kind==='meteor'?Array.from({length:5},randomPoint):[],phase:'warning',until:r.age+2.2});
+    callbacks.event(r,'anomaly_warning',ANOMALIES[kind].warning,'',0,{anomaly:anomalyInfo(r)});
+  }else if(e.phase==='warning'&&r.age>=e.until){
+    e.phase='active';e.until=r.age+ANOMALIES[e.kind].duration;r.lastAnomaly=e.kind;
+    if(e.kind==='meteor')spawnDebris(r);
+    callbacks.event(r,'anomaly_start',`場地異變：${ANOMALIES[e.kind].name}！`,'',0,{anomaly:anomalyInfo(r)});
+  }else if(e.phase==='active'&&r.age>=e.until){
+    callbacks.event(r,'anomaly_end',`${ANOMALIES[e.kind].name}結束`, '',0,{anomaly:anomalyInfo(r)});
+    Object.assign(e,{phase:'idle',kind:null,until:0});
+    r.nextAnomalyAt=r.age+9+Math.random()*4;
+  }
+ }
+ function anomalyImpulse(r,p){
+  if(r.chaos===false||r.anomaly?.phase!=='active')return;
+  const e=r.anomaly,b=p.body,pos=b.translation(),vx=b.linvel().x,vz=b.linvel().z;
+  const dx=e.x-pos.x,dz=e.z-pos.z,d=length(dx,dz),[nx,nz]=norm(dx,dz),m=b.mass();
+  // Anomaly forces are deliberately bounded and mostly central. They must not
+  // invalidate the guarded rim and the V9.2 earned ring-out rule.
+  if(e.kind==='blackhole'&&d<EVENT_RADIUS){
+   const force=clamp((EVENT_RADIUS-d)*.55,.12,1.4)*TICK*m;
+   b.applyImpulse(V(nx*force,0,nz*force),true);
+   if(d<.8)b.applyImpulse(V(-nx*.20*TICK*m,0,-nz*.20*TICK*m),true);
+  }else if(e.kind==='cyclone'){
+   const s=Math.sin(r.age*3+pos.z*.65);b.applyImpulse(V(s*.45*TICK*m,0,.24*Math.cos(r.age*2+pos.x)*TICK*m),true);
+  }else if(e.kind==='magnet'&&d<3.2){
+   const repulse=.95*TICK*m*(1-d/3.2);b.applyImpulse(V(-nx*repulse,0,-nz*repulse),true);
+  }else if(e.kind==='shockwave'&&d<3.7){
+   const phase=(r.age-(e.until-ANOMALIES.shockwave.duration));
+   const radius=.65+phase*1.05;if(Math.abs(d-radius)<.33){
+     const push=.65*TICK*m;b.applyImpulse(V(-nx*push,.24*TICK*m,-nz*push),true);
+   }
+  }
+  // Nothing turns anomalies into uncontrolled outward acceleration near the rim.
+  const speed=length(vx,vz);if(speed>13){b.setLinvel(V(vx*13/speed,b.linvel().y,vz*13/speed),true);}
+ }
  function physicsStep(r){
   const phy=r.physics;
   for(const p of r.fighters){if(!p.alive)continue;
    const b=p.body,pos=b.translation(),w=b.angvel(),v=b.linvel(),axis=quatAxis(b.rotation()),st=stats(p);
+   anomalyImpulse(r,p);
    // Real angular speed, tip friction and angular momentum: extra spin stabilization is an arcade assist.
    const spinSpeed=w.x*axis.x+w.y*axis.y+w.z*axis.z;
    // Motorized launch: retain the physical spin axis while gradually losing launch energy.
@@ -233,6 +304,7 @@ function makeEngine(tops,parts,callbacks){
   phy.queue.drainContactForceEvents(c=>{
    const aid=phy.byCollider.get(c.collider1()),bid=phy.byCollider.get(c.collider2());
    if(!aid&&!bid)return;
+   const fallingDebris=phy.debrisColliders.has(c.collider1())||phy.debrisColliders.has(c.collider2());
    if(aid&&bid&&aid===bid)return;
    const a=r.fighters.find(p=>p.id===aid),b=r.fighters.find(p=>p.id===bid);
    const key=[aid||'W'+c.collider1(),bid||'W'+c.collider2()].sort().join(':');
@@ -245,13 +317,33 @@ function makeEngine(tops,parts,callbacks){
    const pos=who.body.translation(),bb=other?.body.translation();
    const vx=who.body.linvel(),ov=other?.body.linvel()||V(0,0,0);
    const rel=length(vx.x-ov.x,vx.z-ov.z);
-   if(other){
+   if(fallingDebris&&!other){
+     if(r.age-(who.lastDebrisHitAt??-99)>.55){who.lastDebrisHitAt=r.age;
+       who.spinEnergy=Math.max(0,who.spinEnergy-1.6);
+       callbacks.event(r,'debris_hit',`${who.name} 撞上墜落碎片！`,who.id,140,{x:who.x,y:who.y});
+     }
+   }else if(other){
      // Arcade amplification on top of *real* rigid body contact impulse.
      const charged=(a.chargeUntil>r.age||b.chargeUntil>r.age);
      const bladeFactor=clamp(((topBy[a.top].blade?.reach||.39)+(topBy[b.top].blade?.reach||.39))/.78,.8,1.25);
-     const extra=clamp((rel*.32+(charged?2.4:0)+impulse*.000055)*bladeFactor,1.1,6.2);
-     burst(r,a,b,extra,clamp(rel*.13+(charged?1.0:0),.12,2.6));
-     burst(r,b,a,extra,clamp(rel*.13+(charged?1.0:0),.12,2.6));
+     let extra=clamp((rel*.32+(charged?2.4:0)+impulse*.000055)*bladeFactor,1.1,6.2);
+     // Counter rewards reading a charge, not button spamming.
+     let parrier=null,attacker=null;
+     if(a.counterUntil>r.age&&b.chargeUntil>r.age){parrier=a;attacker=b;}
+     else if(b.counterUntil>r.age&&a.chargeUntil>r.age){parrier=b;attacker=a;}
+     if(parrier){
+       burst(r,attacker,parrier,extra+3,clamp(rel*.12,.1,1.2));
+       burst(r,parrier,attacker,.6,.10);
+       attacker.spinEnergy=Math.max(0,attacker.spinEnergy-2.8);
+       parrier.counterUntil=0;parrier.counterCount++;
+       callbacks.event(r,'counter_success',`${parrier.name} · 完美反擊！`,parrier.id,260,{x:parrier.x,y:parrier.y});
+     }else{
+       const precision=charged&&rel>5.2&&length(a.x-b.x,a.y-b.y)<3.5*U;
+       if(precision){extra=Math.min(7.2,extra+1.0);(a.chargeUntil>r.age?a:b).precisionCount++;}
+       burst(r,a,b,extra,clamp(rel*.13+(charged?1.0:0),.12,2.6));
+       burst(r,b,a,extra,clamp(rel*.13+(charged?1.0:0),.12,2.6));
+       if(precision)callbacks.event(r,'precision',`精準重擊！`,(a.chargeUntil>r.age?a:b).id,Math.round(rel*40),{x:(a.x+b.x)/2,y:(a.y+b.y)/2});
+     }
      // Off-axis opposing impulses add visible tipping/gyro reaction (not health damage).
      const sa=topBy[a.top].blade,sb=topBy[b.top].blade;
      const tangent=norm(b.body.translation().x-a.body.translation().x,b.body.translation().z-a.body.translation().z);
@@ -280,6 +372,12 @@ function makeEngine(tops,parts,callbacks){
    }
   });
   phy.queue.drainCollisionEvents(()=>{});
+  for(let i=phy.debris.length-1;i>=0;i--){const d=phy.debris[i];
+    if(r.age>=d.expires||d.body.translation().y<-.9){
+      phy.debrisColliders.delete(d.collider.handle);
+      phy.world.removeRigidBody(d.body);phy.debris.splice(i,1);
+    }
+  }
   // Anti-vault safety: a normal bumper contact must not turn top spin into a
   // vertical catapult. Only act in the protected rim, leaving real N/S exit
   // pockets and the E/W return lanes untouched. Center-field aerial KOs stay.
@@ -321,10 +419,11 @@ function makeEngine(tops,parts,callbacks){
   }
  }
  function tick(r,dt){if(r.status!=='playing')return;r.age+=dt;
+  updateAnomaly(r);
   for(const p of r.fighters){if(!p.alive)continue;
-   p.cool=Math.max(0,p.cool-dt);p.chargeCd=Math.max(0,p.chargeCd-dt);
+   p.cool=Math.max(0,p.cool-dt);p.chargeCd=Math.max(0,p.chargeCd-dt);p.counterCd=Math.max(0,p.counterCd-dt);
    if(p.bot){p.aiTimer-=dt;if(p.aiTimer<=0){p.aiTimer=.4+Math.random()*.6;p.input.targetId=target(r,p)?.id||null;
-      if(r.age>2.6&&Math.random()<.56)charge(r,p,p.input.targetId);if(r.age>2.0&&Math.random()<.22)skill(r,p);}}
+      if(r.age>2.6&&Math.random()<.56)charge(r,p,p.input.targetId);if(r.age>2.0&&Math.random()<.22)skill(r,p);if(r.age>3&&Math.random()<.09)counter(r,p);}}
   }
   for(let i=0;i<3&&r.status==='playing';i++)physicsStep(r);
   if(r.status!=='playing')return;
@@ -333,15 +432,18 @@ function makeEngine(tops,parts,callbacks){
  }
  function snapshot(r){return {t:'tick',physics:'rapier3d',time:+r.age.toFixed(1),radius:Math.round(RING*U),arena:r.arena,
    geometry:{pillars:(PLACES[r.arena]||PLACES.colosseum).map(([x,z,rad])=>({x:x*U,y:z*U,r:rad*U})),lanes:true,exitAngles:[Math.PI/2,-Math.PI/2]},
+   chaos:r.chaos!==false,anomaly:anomalyInfo(r),hazards:(r.physics?.debris||[]).map(d=>{
+     const p=d.body.translation();return {id:d.id,x:+p.x.toFixed(2),y:+p.y.toFixed(2),z:+p.z.toFixed(2),r:d.r};
+   }),
    fighters:r.fighters.map(p=>{if(p.alive)sync(p);return {id:p.id,name:p.name,top:p.top,build:p.build,bot:p.bot,
     x:+p.x.toFixed(1),y:+p.y.toFixed(1),h:+(p.h||0).toFixed(1),q:p.q,vx:Math.round(p.vx),vy:Math.round(p.vy),
     spin:Math.round(p.spin),wobble:Math.round(p.wobble),alive:p.alive,reason:p.koReason||'',rail:p.railTimer>0,
-    cool:+p.cool.toFixed(1),chargeCd:+p.chargeCd.toFixed(1),charging:p.chargeUntil>r.age,shield:p.fortressUntil>r.age,
+    cool:+p.cool.toFixed(1),chargeCd:+p.chargeCd.toFixed(1),counterCd:+p.counterCd.toFixed(1),countering:p.counterUntil>r.age,charging:p.chargeUntil>r.age,shield:p.fortressUntil>r.age,
     phase:p.phaseUntil>r.age,boost:p.boostUntil>r.age,blade:p.bladeUntil>r.age,impact:p.impact>0,skillCount:p.skillCount,
     rpm:Math.round((p.physicalSpin||p.spin)*p.initialSpin/100*60/(Math.PI*2)),launch:p.launch};})};
  }
  function free(r){if(r.physics?.world)r.physics.world.free();r.physics=null;}
- return {create,tick,charge,skill,snapshot,free,stats};
+ return {create,tick,charge,counter,skill,snapshot,free,stats};
 }
 async function init(){if(!initialized){await R.init();initialized=true;}return R;}
 module.exports={init,makeEngine};

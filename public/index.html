@@ -13,14 +13,14 @@
   <title>SPIN//BREAK ARENA | 戰鬥陀螺競技場</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="/style.css" />
-  <script src="/client.js" defer></script>
-  <script type="module" src="/arena3d.js?v=9.3"></script>
+  <script src="/client.js?v=10.0" defer></script>
+  <script type="module" src="/arena3d.js?v=10.0"></script>
 </head>
 <body>
   <div class="background-fx" aria-hidden="true"></div>
   <header class="site-header">
     <div class="brand"><div class="brand-mark"><span class="mark-disc"></span><span class="mark-core"></span></div><div><div class="brand-title">SPIN<span>//</span>BREAK</div><div class="brand-sub">ARENA · 次世代陀螺競技</div></div></div>
-    <div class="header-right"><div class="live-tag"><span class="live-dot" id="netDot"></span><span id="netState">正在連線</span></div><button id="btnSound" class="icon-btn" title="切換音效與節奏音樂">♫ <span id="soundText">音效關</span></button><span class="version">V9.3 · REAL TOP REDESIGN</span></div>
+    <div class="header-right"><div class="live-tag"><span class="live-dot" id="netDot"></span><span id="netState">正在連線</span></div><button id="btnSound" class="icon-btn" title="切換音效與節奏音樂">♫ <span id="soundText">音效關</span></button><span class="version">V10.0 · CHAOS ARENA</span></div>
   </header>
   <div class="marquee"><div class="marquee-inner"><span>IGNITE YOUR SPIRIT <b>✦</b> 超越極限的碰撞 <b>✦</b> 576 種物理改造組合 <b>✦</b> 5 大決戰舞台 <b>✦</b> <strong>LET IT RIP</strong> <b>✦</b> 引爆你的鬥志 <b>✦</b> </span><span aria-hidden="true">IGNITE YOUR SPIRIT <b>✦</b> 超越極限的碰撞 <b>✦</b> 576 種物理改造組合 <b>✦</b> 5 大決戰舞台 <b>✦</b> <strong>LET IT RIP</strong> <b>✦</b> 引爆你的鬥志 <b>✦</b> </span></div></div>
   <main class="layout">
@@ -43,11 +43,11 @@
         <div class="corner-mark tl"></div><div class="corner-mark tr"></div><div class="corner-mark bl"></div><div class="corner-mark br"></div>
         <div class="stage-top-fighters" id="fightHud"></div>
         <div class="center-overlay" id="centerOverlay"><div class="overlay-label">SPIN//BREAK ARENA</div><div class="overlay-heading">準備好<br/><em>燃燒鬥志</em>了嗎？</div><div class="overlay-sub">建立房間即可與 AI 對戰，或邀請朋友加入 2～4 人競技</div><button id="overlayPlay" class="primary-btn big-btn">立即開始對戰 <span>↗</span></button></div>
-        <div class="impact-banner" id="impactBanner"></div>
+        <div class="anomaly-status" id="anomalyStatus" aria-live="polite"></div><div class="impact-banner" id="impactBanner"></div>
         <div class="event-toast" id="eventToast"></div>
-        <div class="touch-controller" id="touchController"><div class="target-zone"><button id="touchTarget" class="target-switch" type="button">◎ 切換鎖定目標</button><span>點擊場上的對手也可以鎖定</span></div><div class="touch-actions"><button class="touch-guard" id="touchGuard">衝鋒 <small>CHARGE</small></button><button class="touch-burst" id="touchBurst">必殺 <small>SKILL</small></button></div></div>
+        <div class="touch-controller" id="touchController"><div class="target-zone"><button id="touchTarget" class="target-switch" type="button">◎ 切換鎖定目標</button><span>點擊場上的對手也可以鎖定</span></div><div class="touch-actions"><button class="touch-counter" id="touchCounter">反擊 <small>PARRY</small></button><button class="touch-guard" id="touchGuard">衝鋒 <small>CHARGE</small></button><button class="touch-burst" id="touchBurst">必殺 <small>SKILL</small></button></div></div>
       </div>
-      <div class="stage-foot"><div class="controls-keyboard"><span class="control-caption">操作方式</span><div class="key-group"><kbd>SPACE</kbd><span>鎖定衝鋒</span></div><div class="key-group"><kbd>J</kbd><span>必殺技</span></div><div class="key-group"><kbd>TAB</kbd><span>切換目標</span></div></div><div class="battle-tip">不需要控制移動！陀螺會自主巡航。看準時機按「衝鋒」撞飛對手，保留轉速再使用必殺技。</div></div>
+      <div class="stage-foot"><div class="controls-keyboard"><span class="control-caption">操作方式</span><div class="key-group"><kbd>SPACE</kbd><span>鎖定衝鋒</span></div><div class="key-group"><kbd>K</kbd><span>反擊</span></div><div class="key-group"><kbd>J</kbd><span>必殺技</span></div><div class="key-group"><kbd>TAB</kbd><span>切換目標</span></div></div><div class="battle-tip">不需要控制移動！陀螺會自主巡航。看準時機按「衝鋒」撞飛對手，保留轉速再使用必殺技。</div></div>
       <div class="bottom-strap"><div class="strap-number">12<span>款獨特陀螺</span></div><div class="strap-divider"></div><div class="strap-number">05<span>座特殊競技場</span></div><div class="strap-divider"></div><div class="strap-number">04<span>人即時混戰</span></div><div class="strap-divider"></div><div class="strap-word">NO LIMITS. ONLY VICTORY.</div></div>
     </section>
     <aside class="right-col">
@@ -85,6 +85,7 @@
         <div class="room-code-row"><div><small>房間邀請代碼</small><strong id="roomCode">-----</strong></div><div class="share-actions"><button class="copy-btn" id="btnCopy" title="複製邀請連結">複製連結</button><button class="share-btn" id="btnShare" title="使用手機的分享選單邀請朋友" disabled>分享邀請</button></div></div>
         <div class="participant-list" id="participants"><div class="placeholder-person">◎ 建立房間，準備開戰</div></div>
         <div class="arena-picker"><label class="field-label" for="arenaSelect">決戰場地 / ARENA</label><select id="arenaSelect" disabled><option>王者競技場</option></select><div class="arena-description" id="arenaDescription">每座競技場都有不同的戰鬥規則。</div></div>
+        <div class="chaos-picker"><label class="field-label" for="chaosSelect">隨機場地異變 / ARENA EVENTS</label><select id="chaosSelect" disabled><option value="on">開啟 · 黑洞、碎片雨與風暴</option><option value="off">關閉 · 純競技</option></select><p>開啟後會有預警再發生異變；不會直接判定淘汰。</p></div>
         <div class="bots-picker"><div><label class="field-label" for="botCount">電腦對手 / AI RIVALS</label><small>可單人練習，最多 4 人同場</small></div><select id="botCount" disabled><option value="1">1 位</option></select></div>
         <button class="start-btn" id="btnStart" disabled>LET IT RIP! <small>開始戰鬥</small><span>➤</span></button>
         <button class="secondary-btn full hidden" id="btnAgain">重新選角 / 再戰一場</button>

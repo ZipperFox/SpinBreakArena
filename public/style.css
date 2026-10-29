@@ -71,3 +71,12 @@
 .launch-panel output{float:right;color:#ffe0a9;font-weight:800}
 .launch-hint{font-size:11px;line-height:1.5;color:#a1bacd;padding:9px;margin-top:10px;border-left:3px solid #e3aa66;background:#0a1826}
 @media(max-width:720px){.garage-3d{height:188px}.paint-row button,.preset-row button{min-height:44px}}
+
+/* V10: touch-friendly parry and readable arena warnings */
+.touch-controller .touch-counter{width:68px;height:68px;min-width:68px;min-height:68px;border:1px solid #91e8e0;border-radius:50%;background:linear-gradient(155deg,#148e95,#0a3d65);color:#fff;font-weight:950;box-shadow:0 0 15px #19f2dd50;cursor:pointer}
+.touch-counter small{display:block;color:#c9fff8;font-size:9px}
+.anomaly-status{position:absolute;z-index:7;left:50%;top:16%;transform:translateX(-50%);pointer-events:none;max-width:88%;font-size:clamp(11px,2.4vw,16px);line-height:1.5;text-align:center;font-weight:950;letter-spacing:.5px;color:#fff;opacity:0;transition:opacity .2s;border-radius:9px;padding:7px 15px}
+.anomaly-status.warning{opacity:1;background:#6a2e0de8;border:1px solid #ffb56a;box-shadow:0 0 18px #ffa35255}
+.anomaly-status.active{opacity:1;background:#172852df;border:1px solid #8fe0ff;box-shadow:0 0 18px #55baff66}
+.chaos-picker{padding:12px 0;border-top:1px solid #456278;margin-top:10px}.chaos-picker select{width:100%;font-size:13px;padding:10px;margin-top:5px;background:#0b1c2d;color:#def7ff;border:1px solid #6385a1;border-radius:7px}.chaos-picker p{font-size:11px;color:#abc9da;margin:6px 0 0}
+@media(max-width:720px){.touch-controller .touch-counter{width:60px!important;height:60px!important;min-width:60px!important;min-height:60px!important;font-size:11px}.touch-controller .touch-actions{gap:4px}.touch-controller .touch-actions .touch-guard,.touch-controller .touch-actions .touch-burst{width:63px!important;height:63px!important}}
