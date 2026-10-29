@@ -33,7 +33,7 @@ function createStage(name){battleground.clear();stageName=name;
  ringTube(5.85,0,Math.PI*2,-.06,hot,.14);
  // Physical guard segments match fixed Rapier collider positions / dangerous gates.
  const guardMat=new THREE.MeshStandardMaterial({color:'#82d7e5',metalness:.56,roughness:.22,transparent:true,opacity:.56,side:THREE.DoubleSide});
- const guardGeo=new THREE.CylinderGeometry(.225,.225,2.0,9);
+ const guardGeo=new THREE.CylinderGeometry(.225,.225,3.36,9);
  const wall=new THREE.InstancedMesh(guardGeo,guardMat,104);let count=0;
  const dummy=new THREE.Object3D();
  for(let i=0;i<104;i++){
@@ -41,19 +41,19 @@ function createStage(name){battleground.clear();stageName=name;
   const danger=Math.abs(Math.abs(Math.sin(a))-1)<.043;
   const portal=Math.abs(Math.sin(a))<.19;
   if(danger||portal)continue;
-  dummy.position.set(Math.cos(a)*5.75,.82,Math.sin(a)*5.75);dummy.updateMatrix();wall.setMatrixAt(count++,dummy.matrix);
+  dummy.position.set(Math.cos(a)*5.75,1.50,Math.sin(a)*5.75);dummy.updateMatrix();wall.setMatrixAt(count++,dummy.matrix);
  }
  wall.count=count;wall.instanceMatrix.needsUpdate=true;battleground.add(wall);
  // Upper guard trim makes the true 3D wall height visible to players.
- ringTube(5.75,.24,Math.PI/2-.31,1.83,cyan,.045);ringTube(5.75,Math.PI/2+.31,Math.PI-.24,1.83,cyan,.045);
- ringTube(5.75,Math.PI+.24,Math.PI*1.5-.31,1.83,cyan,.045);ringTube(5.75,Math.PI*1.5+.31,Math.PI*2-.24,1.83,cyan,.045);
+ ringTube(5.75,.24,Math.PI/2-.31,3.19,cyan,.045);ringTube(5.75,Math.PI/2+.31,Math.PI-.24,3.19,cyan,.045);
+ ringTube(5.75,Math.PI+.24,Math.PI*1.5-.31,3.19,cyan,.045);ringTube(5.75,Math.PI*1.5+.31,Math.PI*2-.24,3.19,cyan,.045);
  const laneMat=new THREE.MeshStandardMaterial({color:'#3cb9d9',metalness:.60,roughness:.28,transparent:true,opacity:.42,side:THREE.DoubleSide});
- const laneGeo=new THREE.CylinderGeometry(.245,.245,1.76,8);
+ const laneGeo=new THREE.CylinderGeometry(.245,.245,2.80,8);
  const laneWall=new THREE.InstancedMesh(laneGeo,laneMat,44);let laneCount=0;
  for(const side of [-1,1]){
-   ringTube(6.84,(side===1?0:Math.PI)-.45,(side===1?0:Math.PI)+.45,1.63,'#4dedff',.055);
+   ringTube(6.84,(side===1?0:Math.PI)-.45,(side===1?0:Math.PI)+.45,2.67,'#4dedff',.055);
    for(let i=0;i<22;i++){const a=(side===1?0:Math.PI)+(i-10.5)*.043;
-     dummy.position.set(6.84*Math.cos(a),.75,6.84*Math.sin(a));dummy.updateMatrix();laneWall.setMatrixAt(laneCount++,dummy.matrix);
+     dummy.position.set(6.84*Math.cos(a),1.27,6.84*Math.sin(a));dummy.updateMatrix();laneWall.setMatrixAt(laneCount++,dummy.matrix);
    }
  }
  laneWall.count=laneCount;laneWall.instanceMatrix.needsUpdate=true;battleground.add(laneWall);
