@@ -14,12 +14,13 @@
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="/style.css" />
   <script src="/client.js" defer></script>
+  <script type="module" src="/arena3d.js"></script>
 </head>
 <body>
   <div class="background-fx" aria-hidden="true"></div>
   <header class="site-header">
     <div class="brand"><div class="brand-mark"><span class="mark-disc"></span><span class="mark-core"></span></div><div><div class="brand-title">SPIN<span>//</span>BREAK</div><div class="brand-sub">ARENA · 次世代陀螺競技</div></div></div>
-    <div class="header-right"><div class="live-tag"><span class="live-dot" id="netDot"></span><span id="netState">正在連線</span></div><button id="btnSound" class="icon-btn" title="切換音效與節奏音樂">♫ <span id="soundText">音效關</span></button><span class="version">V5.0 · CHARGE / COLLISION</span></div>
+    <div class="header-right"><div class="live-tag"><span class="live-dot" id="netDot"></span><span id="netState">正在連線</span></div><button id="btnSound" class="icon-btn" title="切換音效與節奏音樂">♫ <span id="soundText">音效關</span></button><span class="version">V6.0 · TRUE 3D IMPACT</span></div>
   </header>
   <div class="marquee"><div class="marquee-inner"><span>IGNITE YOUR SPIRIT <b>✦</b> 超越極限的碰撞 <b>✦</b> 576 種改造組合 <b>✦</b> 5 大決戰舞台 <b>✦</b> <strong>LET IT RIP</strong> <b>✦</b> 引爆你的鬥志 <b>✦</b> </span><span aria-hidden="true">IGNITE YOUR SPIRIT <b>✦</b> 超越極限的碰撞 <b>✦</b> 576 種改造組合 <b>✦</b> 5 大決戰舞台 <b>✦</b> <strong>LET IT RIP</strong> <b>✦</b> 引爆你的鬥志 <b>✦</b> </span></div></div>
   <main class="layout">
@@ -36,7 +37,7 @@
       </div>
     </aside>
     <section class="stage-col">
-      <div class="stage-header"><div><div class="eyebrow">LIVE COMBAT FEED / 實況戰鬥</div><div class="stage-title" id="stageTitle">王者競技場 <span>· COLOSSEUM</span></div></div><div class="stage-timer"><span id="roundState">STANDBY</span><strong id="gameTimer">01:15</strong></div></div>
+      <div class="stage-header"><div><div class="eyebrow">LIVE COMBAT FEED / 實況戰鬥</div><div class="stage-title" id="stageTitle">王者競技場 <span>· COLOSSEUM</span></div></div><div class="stage-timer"><span id="roundState">STANDBY</span><strong id="gameTimer">01:30</strong></div></div>
       <div class="stage-frame" id="stageFrame">
         <canvas id="stage" width="1000" height="740" aria-label="戰鬥陀螺競技場畫面"></canvas>
         <div class="corner-mark tl"></div><div class="corner-mark tr"></div><div class="corner-mark bl"></div><div class="corner-mark br"></div>
