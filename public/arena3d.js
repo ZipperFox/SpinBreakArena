@@ -32,24 +32,31 @@ function createStage(name){battleground.clear();stageName=name;
  for(let r=1.0;r<5.8;r+=1.0)ringTube(r,0,Math.PI*2,.035,cyan,r>4.4?.015:.01);
  ringTube(5.85,0,Math.PI*2,-.06,hot,.14);
  // Physical guard segments match fixed Rapier collider positions / dangerous gates.
- const ballMat=mat('#80c3dc',.75,.24,'#3479a7',.25);
- const guardGeo=new THREE.SphereGeometry(.245,9,7);
- const wall=new THREE.InstancedMesh(guardGeo,ballMat,104);let count=0;
+ const guardMat=new THREE.MeshStandardMaterial({color:'#82d7e5',metalness:.56,roughness:.22,transparent:true,opacity:.56,side:THREE.DoubleSide});
+ const guardGeo=new THREE.CylinderGeometry(.225,.225,2.0,9);
+ const wall=new THREE.InstancedMesh(guardGeo,guardMat,104);let count=0;
  const dummy=new THREE.Object3D();
  for(let i=0;i<104;i++){
   const a=(i+.5)*Math.PI*2/104;
   const danger=Math.abs(Math.abs(Math.sin(a))-1)<.043;
   const portal=Math.abs(Math.sin(a))<.19;
   if(danger||portal)continue;
-  dummy.position.set(Math.cos(a)*5.75,.42,Math.sin(a)*5.75);dummy.updateMatrix();wall.setMatrixAt(count++,dummy.matrix);
+  dummy.position.set(Math.cos(a)*5.75,.82,Math.sin(a)*5.75);dummy.updateMatrix();wall.setMatrixAt(count++,dummy.matrix);
  }
  wall.count=count;wall.instanceMatrix.needsUpdate=true;battleground.add(wall);
- ringTube(5.75,.26,Math.PI/2-.26,.42,cyan,.075);ringTube(5.75,Math.PI/2+.26,Math.PI-.26,.42,cyan,.075);
- ringTube(5.75,Math.PI+.26,Math.PI*1.5-.26,.42,cyan,.075);ringTube(5.75,Math.PI*1.5+.26,Math.PI*2-.26,.42,cyan,.075);
+ // Upper guard trim makes the true 3D wall height visible to players.
+ ringTube(5.75,.24,Math.PI/2-.31,1.83,cyan,.045);ringTube(5.75,Math.PI/2+.31,Math.PI-.24,1.83,cyan,.045);
+ ringTube(5.75,Math.PI+.24,Math.PI*1.5-.31,1.83,cyan,.045);ringTube(5.75,Math.PI*1.5+.31,Math.PI*2-.24,1.83,cyan,.045);
+ const laneMat=new THREE.MeshStandardMaterial({color:'#3cb9d9',metalness:.60,roughness:.28,transparent:true,opacity:.42,side:THREE.DoubleSide});
+ const laneGeo=new THREE.CylinderGeometry(.245,.245,1.76,8);
+ const laneWall=new THREE.InstancedMesh(laneGeo,laneMat,44);let laneCount=0;
  for(const side of [-1,1]){
-   ringTube(6.7,(side===1?0:Math.PI)-.4,(side===1?0:Math.PI)+.4,.31,'#4dedff',.06);
-   for(let i=-7;i<=7;i++){const a=(side===1?0:Math.PI)+i*.05;const c=mesh(new THREE.SphereGeometry(.19,9,7),mat('#28778c',.72,.25,cyan,.38),battleground);c.position.set(6.7*Math.cos(a),.3,6.7*Math.sin(a));}
+   ringTube(6.84,(side===1?0:Math.PI)-.45,(side===1?0:Math.PI)+.45,1.63,'#4dedff',.055);
+   for(let i=0;i<22;i++){const a=(side===1?0:Math.PI)+(i-10.5)*.043;
+     dummy.position.set(6.84*Math.cos(a),.75,6.84*Math.sin(a));dummy.updateMatrix();laneWall.setMatrixAt(laneCount++,dummy.matrix);
+   }
  }
+ laneWall.count=laneCount;laneWall.instanceMatrix.needsUpdate=true;battleground.add(laneWall);
  for(const sign of [-1,1]){const danger=mesh(new THREE.BoxGeometry(1.1,.07,.14),mat('#f35f44',.35,.25,'#ff4f25',1.3),battleground);danger.position.set(0,.12,sign*5.78);}
  const placements={colosseum:[[0,-3.2,.42],[0,3.2,.42]],vortex:[[-2.8,-2.35,.42],[2.8,2.35,.42],[-2.8,2.35,.38],[2.8,-2.35,.38]],tempest:[[0,-3.35,.46],[0,3.35,.46]],volcano:[[-2.9,-2.65,.50],[2.9,2.65,.50]],eclipse:[[-2.5,0,.44],[2.5,0,.44]]};
  for(const [x,z,r] of (placements[name]||placements.colosseum)){
