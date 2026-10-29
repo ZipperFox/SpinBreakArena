@@ -5,10 +5,11 @@
   "description": "Rapier 3D multiplayer spinning top physics battle - authoritative WebSocket server",
   "scripts": {
     "start": "node server.js",
-    "postinstall": "node scripts/copy-three.js && node test_3d.js && node test_v9.js && node scripts/smoke-multiplayer.js",
+    "postinstall": "node scripts/copy-three.js && node test_3d.js && node test_v9.js && node test_guardrails.js && node scripts/smoke-multiplayer.js",
     "test": "node test_multiplayer.js",
     "test:3d": "node test_3d.js",
     "test:v9": "node test_v9.js",
+    "test:guardrails": "node test_guardrails.js",
     "verify:live": "node verify_live.js"
   },
   "dependencies": {
