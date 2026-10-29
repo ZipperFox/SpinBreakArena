@@ -143,7 +143,7 @@ function makeEngine(tops,parts,callbacks){
    const lateral=length(v.x,v.z);const radius=length(pos.x,pos.z);
    if(spinSpeed>10){
     const strength=(.055+st.stability*.14)*clamp(spinSpeed/95,.2,1.5);
-    b.applyTorque(V(-axis.z*strength,0,axis.x*strength),true);
+    b.applyTorqueImpulse(V(-axis.z*strength*TICK,0,axis.x*strength*TICK),true);
     // Very light autonomous curvature from tip geometry, never player steering.
     if(p.stunUntil<=r.age&&p.chargeUntil<=r.age&&p.railTimer<=0){const [nx,nz]=norm(pos.x,pos.z);const torque=clamp((2.2-lateral)*.038,.002,.11)*st.drive;
       b.applyImpulse(V(-nz*p.orbitSign*torque,0,nx*p.orbitSign*torque),true);
@@ -159,7 +159,7 @@ function makeEngine(tops,parts,callbacks){
    if(r.arena==='volcano'&&r.age%8>6&&r.age%8<7&&Math.abs(pos.x)<2) b.applyImpulse(V(.045,.06,.025),true);
    const speed=length(v.x,v.z),max=15;if(speed>max){const s=max/speed;b.setLinvel(V(v.x*s,v.y,v.z*s),true);}
    const decay=(.017+(p.bladeUntil>r.age?.005:0)+Math.max(0,1-st.stamina*.11)*.009)*st.drain;
-   b.applyTorque(V(-w.x*.003,-w.y*decay,-w.z*.003),true);
+   b.applyTorqueImpulse(V(-w.x*.003*TICK,-w.y*decay*TICK,-w.z*.003*TICK),true);
   }
   phy.world.step(phy.queue);
   // Contact force events and real velocity impulses measured by Rapier.
