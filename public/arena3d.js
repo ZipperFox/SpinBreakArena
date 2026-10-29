@@ -299,9 +299,9 @@ function loop(t){requestAnimationFrame(loop);const dt=Math.min(.05,Math.max(.001
    if(Array.isArray(p.q)){
       const q=new THREE.Quaternion(...p.q).normalize();
       const axis=Array.isArray(p.axis)?new THREE.Vector3(...p.axis).normalize():new THREE.Vector3(0,1,0).applyQuaternion(q).normalize();
-      if(Number.isFinite(p.phase)){
+      if(Number.isFinite(p.spinPhase)){
         const tilt=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),axis);
-        const spin=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),p.phase);
+        const spin=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),p.spinPhase);
         obj.targetQ.copy(tilt).multiply(spin);
       }else obj.targetQ.copy(q);
    }

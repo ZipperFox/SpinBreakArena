@@ -22,7 +22,7 @@ async function run(){const checkHttp=await new Promise((resolve,reject)=>http.ge
  assert(synced.every(x=>x.round===synced[0].round&&x.serverNow===synced[0].serverNow));
  assert(synced.every(x=>JSON.stringify(x.fighters)===JSON.stringify(synced[0].fighters)),
   'Different clients received different poses for the same authoritative frame');
- assert(synced.every(x=>Number.isFinite(x.fighters[0].phase)));
+ assert(synced.every(x=>Number.isFinite(x.fighters[0].spinPhase)));
  assert(synced.every(x=>x.time>0&&x.time<5));
  a.send({t:'ping',sentAt:1234});const pong=await a.wait(m=>m.t==='pong'&&m.sentAt===1234);
  assert(Number.isFinite(pong.serverNow));

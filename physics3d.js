@@ -441,7 +441,7 @@ function makeEngine(tops,parts,callbacks){
      const p=d.body.translation();return {id:d.id,x:+p.x.toFixed(2),y:+p.y.toFixed(2),z:+p.z.toFixed(2),r:d.r};
    }),
    fighters:r.fighters.map(p=>{if(p.alive)sync(p);return {id:p.id,name:p.name,top:p.top,build:p.build,bot:p.bot,
-    x:+p.x.toFixed(2),y:+p.y.toFixed(2),h:+(p.h||0).toFixed(2),q:p.q,phase:+(p.visualPhase||0).toFixed(4),vx:Math.round(p.vx),vy:Math.round(p.vy),
+    x:+p.x.toFixed(2),y:+p.y.toFixed(2),h:+(p.h||0).toFixed(2),q:p.q,spinPhase:+(p.visualPhase||0).toFixed(4),vx:Math.round(p.vx),vy:Math.round(p.vy),
     spin:Math.round(p.spin),wobble:Math.round(p.wobble),alive:p.alive,reason:p.koReason||'',rail:p.railTimer>0,
     cool:+p.cool.toFixed(1),chargeCd:+p.chargeCd.toFixed(1),counterCd:+p.counterCd.toFixed(1),countering:p.counterUntil>r.age,charging:p.chargeUntil>r.age,shield:p.fortressUntil>r.age,
     phase:p.phaseUntil>r.age,boost:p.boostUntil>r.age,blade:p.bladeUntil>r.age,impact:p.impact>0,skillCount:p.skillCount,

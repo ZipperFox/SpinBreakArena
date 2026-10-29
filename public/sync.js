@@ -19,7 +19,7 @@
     return {...base,
       x:interpolate(a.x,b.x,t), y:interpolate(a.y,b.y,t), h:interpolate(a.h,b.h,t),
       spin:interpolate(a.spin,b.spin,t), wobble:interpolate(a.wobble,b.wobble,t),
-      phase:Number.isFinite(a.phase)&&Number.isFinite(b.phase)?interpolate(a.phase,b.phase,t):undefined,
+      spinPhase:Number.isFinite(a.spinPhase)&&Number.isFinite(b.spinPhase)?interpolate(a.spinPhase,b.spinPhase,t):undefined,
       // Interpolate the tilt axis, never the aliased high-frequency yaw quaternion.
       axis:axis(a.q).map((v,i)=>interpolate(v,axis(b.q)[i],t)),
       q:a.q
