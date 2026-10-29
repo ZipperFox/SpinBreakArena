@@ -55,8 +55,8 @@ function makeEngine(tops,parts,callbacks){
    const a=TAU*i/membersCount-Math.PI/2+.48;
    const launch=p.launch||{angle:0,power:85,lane:0};
    const lane=clamp(launch.lane||0,-1,1),angle=clamp(launch.angle||0,-40,40)*Math.PI/180;
-   const theta=a+lane*.22,launchSpeed=(2.0+clamp(launch.power||85,55,100)*.032)*stats(p).drive;
-   const x=(2.20+Math.abs(lane)*.35)*Math.cos(theta),z=(2.20+Math.abs(lane)*.35)*Math.sin(theta),t=topBy[p.top];
+   const theta=a+lane*.22,launchSpeed=(1.2+clamp(launch.power||85,55,100)*.020)*stats(p).drive;
+   const x=(1.92+Math.abs(lane)*.22)*Math.cos(theta),z=(1.92+Math.abs(lane)*.22)*Math.sin(theta),t=topBy[p.top];
    const st=stats(p),rad=.48,spinRate=(77+st.stamina*3)*(0.79+clamp(launch.power||85,55,100)*.0025);
    const direct=theta+Math.PI/2+angle;
    // Top-shaped compound collision body: bottom tip + mid ratchet + large attack rim.
@@ -191,6 +191,9 @@ function makeEngine(tops,parts,callbacks){
      const force=V(-nx*3.8-b.linvel().x*.22,1.25, -nz*3.8-b.linvel().z*.22);
      b.applyImpulse(V(force.x*b.mass()*TICK,force.y*b.mass()*TICK,force.z*b.mass()*TICK),true);
    }
+   // Shallow bowl guidance near the perimeter: reduces accidental self-ring-outs.
+   // It is intentionally weak; charged impacts can still overwhelm it.
+   if(radius>4.2&&p.chargeUntil<=r.age&&p.railTimer<=0){const pull=Math.min(.7,(radius-4.2)*.28);b.applyImpulse(V(-pos.x/radius*pull*TICK*b.mass(),0,-pos.z/radius*pull*TICK*b.mass()),true);}
    if(radius>4.8&&r.arena==='vortex')b.applyImpulse(V(-pos.x/radius*.024,0,-pos.z/radius*.024),true);
    if(r.arena==='tempest')b.applyImpulse(V(-pos.z*.002,0,pos.x*.002),true);
    if(r.arena==='volcano'&&r.age%8>6&&r.age%8<7&&Math.abs(pos.x)<2) b.applyImpulse(V(.045,.06,.025),true);
@@ -252,7 +255,7 @@ function makeEngine(tops,parts,callbacks){
   for(const p of r.fighters){if(!p.alive)continue;
    p.cool=Math.max(0,p.cool-dt);p.chargeCd=Math.max(0,p.chargeCd-dt);
    if(p.bot){p.aiTimer-=dt;if(p.aiTimer<=0){p.aiTimer=.4+Math.random()*.6;p.input.targetId=target(r,p)?.id||null;
-      if(Math.random()<.62)charge(r,p,p.input.targetId);if(Math.random()<.26)skill(r,p);}}
+      if(r.age>2.6&&Math.random()<.56)charge(r,p,p.input.targetId);if(r.age>2.0&&Math.random()<.22)skill(r,p);}}
   }
   for(let i=0;i<3&&r.status==='playing';i++)physicsStep(r);
   if(r.status!=='playing')return;
