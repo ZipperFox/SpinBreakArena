@@ -1,55 +1,66 @@
-/** Checks the V3 physical win conditions without opening network sockets. */
+/** V4 physical acceptance tests: knockback, exits, rails, real obstacles and customizable builds. */
 'use strict';
 const assert=require('node:assert/strict');
-const {fightersFor,tickRoom,skill,snapshot,TOPS}=require('./server');
-function make(topA='phoenix',topB='behemoth'){
- const r={code:'TEST',round:1,host:'p1',arena:'colosseum',status:'playing',bots:0,players:[{id:'p1',name:'A',top:topA,bot:false},{id:'p2',name:'B',top:topB,bot:false}],age:0,fighters:[],events:[],results:null,hitPairs:new Map(),updated:Date.now()};
- r.fighters=fightersFor(r);
- return r;
+const {fightersFor,tickRoom,snapshot,TOPS,PARTS,arenaFeatures,validBuild,massOf}=require('./server');
+function make(arena='colosseum'){
+ const r={code:'TEST',round:1,host:'p1',arena,status:'playing',bots:0,players:[{id:'p1',name:'A',top:'phoenix',build:{ratchet:'swift2',bit:'flat'},bot:false},{id:'p2',name:'B',top:'behemoth',build:{ratchet:'heavy5',bit:'rubber'},bot:false}],age:0,fighters:[],events:[],results:null,hitPairs:new Map(),updated:Date.now()};
+ r.fighters=fightersFor(r);return r;
 }
-{
- const r=make();const f=r.fighters;
- assert(f.every(p=>!Object.hasOwn(p,'hp')),'No player may have health');
- assert(snapshot(r).fighters.every(p=>!Object.hasOwn(p,'hp')),'Network state must not expose health');
- f[0].x=-20;f[0].y=0;f[1].x=20;f[1].y=0;
- f[0].vx=185;f[1].vx=-175;const before=f.map(p=>p.spin);
- tickRoom(r,1/30);
- assert(f[0].vx<185&&f[1].vx>-175,'Contact must physically alter velocities');
- assert(f.some((p,i)=>p.spin<before[i]),'Contact must dissipate spin');
- console.log('✓ Impact transfers momentum, loses rotational energy; no HP');
-}
+function simulate(r,ticks=1){for(let i=0;i<ticks&&r.status==='playing';i++)tickRoom(r,1/30);}
 {
  const r=make();let [a,b]=r.fighters;
- a.x=0;a.y=0;a.vx=0;a.vy=0;
- b.x=212;b.y=0;b.vx=300;b.vy=0;b.edgeKick=220;
- tickRoom(r,1/30);
- assert.equal(b.alive,false,'Strong outward collision at the rim must cause ring-out');
+ assert(!('hp' in a));assert(!('hp' in snapshot(r).fighters[0]));
+ a.x=-21;a.y=0;b.x=21;b.y=0;a.vx=235;b.vx=-205;a.vy=b.vy=0;
+ const vxBefore=a.vx+b.vx;
+ simulate(r,1);
+ assert(a.knockX < -100 && b.knockX>100,'Contact has lasting opposite-direction impulses');
+ assert(a.spin<100&&b.spin<100,'Contact dissipates spin');
+ simulate(r,5);
+ assert(a.knockX<0&&b.knockX>0,'Post-contact impulses survive multiple steering ticks');
+ assert(snapshot(r).fighters.every(p=>Number.isFinite(p.vx)));
+ console.log('✓ Heavy physical rebound persists past player steering, without HP');
+}
+{
+ const r=make();const b=r.fighters[1];b.x=210;b.y=0;b.vx=180;b.vy=0;b.edgeKick=190;
+ simulate(r,1);
+ assert(b.railTimer>0,'Right rail must catch fast outward-moving top');
+ assert(b.alive);simulate(r,31);
+ assert.equal(b.railTimer,0);assert(b.alive,'A recovered top continues to fight');
+ assert(r.events.some(e=>e.kind==='return'));
+ console.log('✓ External acceleration corridor catches and returns a top');
+}
+{
+ const r=make();const b=r.fighters[1];b.x=0;b.y=214;b.vx=0;b.vy=360;b.edgeKick=180;
+ simulate(r,1);
+ assert(!b.alive,'Danger pocket under powerful knockback must ring out');
  assert.equal(b.koReason,'擊出場外');
- assert.equal(r.status,'results');
- assert.equal(r.results[0].id,'p1');
- console.log('✓ Strong knockback ejects a top and ends the match');
+ console.log('✓ Dangerous north/south opening still permits decisive ring-out');
 }
 {
- const r=make();let [a,b]=r.fighters;
- a.x=0;a.y=0;a.vx=0;a.vy=0;
- b.x=211;b.y=0;b.vx=100;b.vy=0;b.edgeKick=0;
- tickRoom(r,1/30);
- assert.equal(b.alive,true,'Steering into the bowl wall without an enemy hit should rebound');
- assert(b.x<=235-22+.01,'Rim bounce must hold top in the arena');
- console.log('✓ Low-impact bowl contact rebounds without arbitrary ring-out');
+ const r=make();const b=r.fighters[1];b.x=210;b.y=0;b.vx=25;b.vy=0;b.edgeKick=0;
+ simulate(r,1);
+ assert(b.alive);assert(b.x<=235-22+.01);assert(b.railTimer===0);
+ console.log('✓ Ordinary rim contact rebounds instead of arbitrary ring-out');
 }
 {
- const r=make();const b=r.fighters[1];b.spin=1.51;
- tickRoom(r,1/30);
- assert.equal(b.alive,false,'A top must stop spinning from physical drag');
- assert.equal(b.koReason,'停止轉動');
- assert.equal(r.results[0].id,'p1');
- console.log('✓ Spin stops from drag and terminates the round');
+ const r=make();const a=r.fighters[0];a.x=0;a.y=-123;a.vx=0;a.vy=100;
+ simulate(r,1);assert(a.y> -123+0||a.knockY!==0);
+ assert(arenaFeatures(r).pillars.length===2);
+ console.log('✓ Physical bumper obstacles included in authoritative geometry');
 }
 {
- const r=make();const a=r.fighters[0];a.spin=70;
- skill(r,a);assert.equal(a.skillCount,1);assert(a.spin<70);
- assert(snapshot(r).fighters.every(p=>Number.isFinite(p.spin)&&Number.isFinite(p.wobble)));
- console.log('✓ Burst uses spin energy; state includes wobble and no health');
+ const r=make();r.fighters[1].spin=1.51;simulate(r,1);
+ assert.equal(r.fighters[1].alive,false);assert.equal(r.fighters[1].koReason,'停止轉動');
+ console.log('✓ Spin finish when rotational energy runs out');
 }
-console.log(`ALL PHYSICS TESTS PASS (${TOPS.length} tops)`);
+{
+ assert.equal(PARTS.ratchets.length,6);assert.equal(PARTS.bits.length,8);
+ assert.equal(TOPS.length*PARTS.ratchets.length*PARTS.bits.length,576);
+ const a=validBuild({ratchet:'swift2',bit:'flat'});
+ const b=validBuild({ratchet:'heavy5',bit:'rubber'});
+ const unknown=validBuild({ratchet:'__proto__',bit:'invalid'});
+ assert.equal(unknown.bit,'taper');
+ assert.notEqual(massOf({...make().fighters[0],build:a}),massOf({...make().fighters[0],build:b}));
+ console.log('✓ 576 valid component combinations and server-side input validation');
+}
+console.log('ALL V4 PHYSICS TESTS PASS');

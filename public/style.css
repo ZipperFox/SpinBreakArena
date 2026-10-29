@@ -35,3 +35,12 @@
  .copy-btn{padding:12px 8px}
  .mobile-help{order:0}
 }
+
+/* V4: real lobby customization and accessible touch controls */
+.customize-panel{margin:15px 0 8px;padding:13px 12px 11px;background:linear-gradient(145deg,#152739,#0b1422);border:1px solid #4c8da4;border-radius:9px}
+.customize-panel .field-label{margin:10px 0 5px;color:#c9e3ef}
+.customize-panel select{min-height:42px;font-size:12px;padding:9px 10px;color:#e9f5ff}
+.build-info{padding:10px;margin-top:12px;background:#07101bbb;border-radius:7px;font-size:11px;line-height:1.6;color:#c8d8e8}
+.build-info strong{display:block;color:#ffc887;margin-bottom:3px;font-size:12px}
+.build-info span{color:#9db4cb}
+@media(max-width:720px){.customize-panel select{font-size:16px}.customize-panel{padding:14px}.touch-controller{padding-bottom:12px}}

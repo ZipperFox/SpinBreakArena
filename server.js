@@ -24,12 +24,39 @@ const TOPS = [
   {id:'unicorn',name:'星辰獨角獸',type:'平衡',a:4,d:5,s:6,e:5,skill:'星環衝擊',power:'nova',cd:11,color:'#d3b3ff',accent:'#fcffff'},
 ];
 const TOP_BY_ID = Object.fromEntries(TOPS.map(x => [x.id, x]));
+// Original fantasy parts: inspired by the real three-layer customization principle, not licensed toy parts.
+const PARTS = {
+ ratchets: [
+  {id:'low3',name:'三翼低重心',code:'3-L',mass:-.07,stability:.10,recoil:.06,drag:0,gear:3,desc:'輕快，低重心，容易控制'},
+  {id:'heavy5',name:'五爪鋼輪',code:'5-H',mass:.18,stability:.02,recoil:.04,drag:.025,gear:5,desc:'重量衝擊，機動較低'},
+  {id:'wide7',name:'七星平衡輪',code:'7-B',mass:.03,stability:.14,recoil:0,drag:.035,gear:7,desc:'抗晃動，偏向穩定'},
+  {id:'tall4',name:'四刃高塔輪',code:'4-T',mass:-.02,stability:-.08,recoil:.19,drag:0,gear:4,desc:'高攻擊角度，但易晃動'},
+  {id:'dense9',name:'九齒密度輪',code:'9-D',mass:.11,stability:.07,recoil:-.02,drag:.045,gear:9,desc:'持久穩重，速度稍慢'},
+  {id:'swift2',name:'雙刃疾速輪',code:'2-S',mass:-.13,stability:-.04,recoil:.14,drag:0,gear:2,desc:'高速反彈，抗撞較弱'}
+ ],
+ bits: [
+  {id:'flat',name:'平面衝擊軸',code:'FL',drive:1.24,control:.88,spinDrain:1.13,grip:1.17,rail:1.03,desc:'高速亂衝，碰撞爆發強'},
+  {id:'rush',name:'追擊高速軸',code:'RU',drive:1.13,control:1.06,spinDrain:1.14,grip:1.09,rail:1.28,desc:'善於咬合外圈加速軌道'},
+  {id:'ball',name:'球形耐久軸',code:'BA',drive:.84,control:.93,spinDrain:.77,grip:.95,rail:.85,desc:'低摩擦，保持轉速'},
+  {id:'needle',name:'尖針守心軸',code:'NE',drive:.66,control:1.12,spinDrain:.71,grip:.93,rail:.82,desc:'低速守中，靠穩定獲勝'},
+  {id:'taper',name:'錐形平衡軸',code:'TA',drive:1.02,control:1.04,spinDrain:.99,grip:1,rail:1,desc:'攻守均衡，適合起步'},
+  {id:'orbit',name:'環流萬向軸',code:'OR',drive:1.08,control:1.12,spinDrain:1.02,grip:1.01,rail:1.06,desc:'方向轉換靈活'},
+  {id:'gear',name:'齒輪突進軸',code:'GE',drive:1.10,control:.88,spinDrain:1.18,grip:1.04,rail:1.44,desc:'軌道增速最強，但消耗轉速'},
+  {id:'rubber',name:'橡膠制動軸',code:'RB',drive:.90,control:1.25,spinDrain:1.22,grip:1.28,rail:.78,desc:'抓地強，撞擊不易失控'}
+ ]
+};
+const RAT = Object.fromEntries(PARTS.ratchets.map(p=>[p.id,p]));
+const BIT = Object.fromEntries(PARTS.bits.map(p=>[p.id,p]));
+const DEFAULT_BUILD={ratchet:'wide7',bit:'taper'};
+const validBuild=b=>({ratchet:RAT[b?.ratchet]?b.ratchet:DEFAULT_BUILD.ratchet,bit:BIT[b?.bit]?b.bit:DEFAULT_BUILD.bit});
+const buildCode=b=>RAT[b.ratchet].code+' / '+BIT[b.bit].code;
+const partStats=p=>{const rat=RAT[p.build?.ratchet]||RAT.wide7,bit=BIT[p.build?.bit]||BIT.taper;return {rat,bit,mass:clamp(1+rat.mass,.78,1.23),drive:bit.drive,control:bit.control,spinDrain:bit.spinDrain,grip:bit.grip,rail:bit.rail,stability:rat.stability,recoil:rat.recoil};};
 const ARENAS = [
-  {id:'colosseum',name:'王者競技場',desc:'標準競技場，純粹決勝負'},
-  {id:'vortex',name:'深淵漩渦',desc:'中央引力改變走位'},
-  {id:'tempest',name:'雷暴聖域',desc:'旋轉風場，順勢加速'},
-  {id:'volcano',name:'熔岩裂谷',desc:'雙側熔岩間歇噴發'},
-  {id:'eclipse',name:'終焉日蝕',desc:'隨時間逐漸收縮的戰圈'},
+  {id:'colosseum',name:'王者競技場',desc:'弧形防撞護欄／兩處回場加速通道／南北出界口'},
+  {id:'vortex',name:'深淵漩渦',desc:'四個緩衝墩／回場軌道／中央引力改變走位'},
+  {id:'tempest',name:'雷暴聖域',desc:'雙側加速護欄／旋轉風場／反彈再進攻'},
+  {id:'volcano',name:'熔岩裂谷',desc:'高彈力障礙墩／間歇噴發／危險出界口'},
+  {id:'eclipse',name:'終焉日蝕',desc:'安全護欄逐漸內縮，後期封閉回場通道'},
 ];
 const ARENA_IDS = new Set(ARENAS.map(a=>a.id));
 const rooms = new Map();
@@ -44,7 +71,7 @@ const dist = (x,y) => Math.hypot(x,y);
 const now = () => Date.now();
 function safeName(v) { return String(v || '挑戰者').replace(/[<>\\\r\n\t]/g,'').slice(0,16).trim() || '挑戰者'; }
 function code() { let s; do { s = [...crypto.randomBytes(5)].slice(0,5).map(v=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[v%32]).join(''); } while(rooms.has(s)); return s; }
-function publicRoom(r) {return {code:r.code,host:r.host,status:r.status,arena:r.arena,bots:r.bots,players:r.players.map(p=>({id:p.id,name:p.name,top:p.top,bot:p.bot,connected:p.connected!==false,ready:p.connected!==false})),results:r.results||null,round:r.round};}
+function publicRoom(r) {return {code:r.code,host:r.host,status:r.status,arena:r.arena,bots:r.bots,players:r.players.map(p=>({id:p.id,name:p.name,top:p.top,build:p.build,bot:p.bot,connected:p.connected!==false,ready:p.connected!==false})),results:r.results||null,round:r.round};}
 function send(ws, obj) { if (!ws || ws.closed) return; if(ws.sock.writableLength>1024*1024)return disconnect(ws); const data = Buffer.from(JSON.stringify(obj)); let head; if (data.length<126) {head=Buffer.from([0x81,data.length]);} else if(data.length<65536){head=Buffer.alloc(4);head[0]=0x81;head[1]=126;head.writeUInt16BE(data.length,2);}else {head=Buffer.alloc(10);head[0]=0x81;head[1]=127;head.writeBigUInt64BE(BigInt(data.length),2);} try{ws.sock.write(Buffer.concat([head,data]));}catch{disconnect(ws);} }
 function broadcast(r,obj){for(const p of r.players){if(!p.bot)send(p.ws,obj);}}
 function updateLobby(r){ r.updated=now();broadcast(r,{t:'room',room:publicRoom(r)}); }
@@ -96,26 +123,36 @@ function createRoom(ws, msg, joinCode) {
   if(joinCode){r=rooms.get(String(joinCode).trim().toUpperCase());if(!r)return error(ws,'找不到房間，請確認房間代碼');if(r.status!=='lobby')return error(ws,'對戰進行中，請等待下一場');if(r.players.length>=MAX_PLAYERS)return error(ws,'房間人數已滿');while(r.players.length+1+r.bots>MAX_PLAYERS)r.bots--;}
   else {if(rooms.size>=MAX_ROOMS)return error(ws,'伺服器房間已達上限，稍後再試');r={code:code(),host:ws.id,status:'lobby',arena:'colosseum',bots:1,players:[],fighters:[],events:[],results:null,round:0,updated:now(),age:0,hitPairs:new Map()};rooms.set(r.code,r);}
   const token=crypto.randomBytes(32).toString('hex');
-  ws.room=r;r.players.push({id:ws.id,name:safeName(msg.name),top:TOP_BY_ID[msg.top]?msg.top:'phoenix',bot:false,ws,connected:true,lostAt:0,token});
+  ws.room=r;r.players.push({id:ws.id,name:safeName(msg.name),top:TOP_BY_ID[msg.top]?msg.top:'phoenix',build:validBuild(msg.build),bot:false,ws,connected:true,lostAt:0,token});
   send(ws,{t:'joined',id:ws.id,room:publicRoom(r),token,resumed:false});updateLobby(r);
 }
 function fightersFor(r){const members=r.players.filter(p=>!p.bot).map(p=>({...p}));const picks=TOPS.slice();for(let i=picks.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[picks[i],picks[j]]=[picks[j],picks[i]];}
-  for(let i=0;i<r.bots;i++){members.push({id:'bot'+i,name:['烈焰','閃電','旋風'][i]+'機神',top:picks[(i+r.round*3)%picks.length].id,bot:true});}
-  return members.map((p,i)=>{let a=2*Math.PI*i/members.length-Math.PI/2;return {...p,x:Math.cos(a)*157,y:Math.sin(a)*157,vx:Math.cos(a+Math.PI/2)*65,vy:Math.sin(a+Math.PI/2)*65,spin:100,wobble:0,koReason:'',edgeKick:0,alive:true,shield:false,cool:0,burstUntil:0,fortressUntil:0,phaseUntil:0,slowUntil:0,bladeUntil:0,boostUntil:0,stunUntil:0,edgeRisk:0,skillCount:0,impact:0,score:0,lastHit:null,lastHitAt:0,input:{x:0,y:0,guard:false},aiTimer:0,aiTarget:null};});
+  for(let i=0;i<r.bots;i++){members.push({id:'bot'+i,name:['烈焰','閃電','旋風'][i]+'機神',top:picks[(i+r.round*3)%picks.length].id,build:{ratchet:PARTS.ratchets[(i+r.round)%PARTS.ratchets.length].id,bit:PARTS.bits[(i*3+r.round)%PARTS.bits.length].id},bot:true});}
+  return members.map((p,i)=>{let a=2*Math.PI*i/members.length-Math.PI/2;return {...p,x:Math.cos(a)*157,y:Math.sin(a)*157,vx:Math.cos(a+Math.PI/2)*65,vy:Math.sin(a+Math.PI/2)*65,knockX:0,knockY:0,railTimer:0,railCooldown:0,railAngle:0,railSign:1,spin:100,wobble:0,koReason:'',edgeKick:0,alive:true,shield:false,cool:0,burstUntil:0,fortressUntil:0,phaseUntil:0,slowUntil:0,bladeUntil:0,boostUntil:0,stunUntil:0,edgeRisk:0,skillCount:0,impact:0,score:0,lastHit:null,lastHitAt:0,input:{x:0,y:0,guard:false},aiTimer:0,aiTarget:null};});
 }
 function start(r){if(r.status!=='lobby')return;if(r.players.filter(x=>x.connected).length<1||r.players.some(x=>!x.connected))return;if(r.players.length+r.bots<2)return; r.round++;r.fighters=fightersFor(r);r.status='playing';r.age=0;r.results=null;r.hitPairs.clear();r.events=[];broadcast(r,{t:'room',room:publicRoom(r)});event(r,'start','BATTLE START!','',0);}
-function event(r,kind,msg,id,amount){const e={t:'event',kind,msg,id,amount,seq:crypto.randomBytes(3).toString('hex')};r.events.push(e);if(r.events.length>12)r.events.shift();broadcast(r,e);}
+function event(r,kind,msg,id,amount,extra={}){const e={t:'event',kind,msg,id,amount,...extra,seq:crypto.randomBytes(3).toString('hex')};r.events.push(e);if(r.events.length>12)r.events.shift();broadcast(r,e);}
 // V3: ring-out and spin-stop physics. There is no health, hit point or damage system.
 const DISC_R=22;
-const massOf=p=>{const t=TOP_BY_ID[p.top];return 1+(t.d-5)*.075+(t.type==='防禦'?.07:0);};
-const gripOf=p=>{const t=TOP_BY_ID[p.top];return clamp(.75+t.e*.055 + (p.input.guard?.18:0),.8,1.45);};
+const massOf=p=>{const t=TOP_BY_ID[p.top];return (1+(t.d-5)*.075+(t.type==='防禦'?.07:0))*partStats(p).mass;};
+const gripOf=p=>{const t=TOP_BY_ID[p.top];return clamp((.75+t.e*.055 + (p.input.guard?.18:0))*partStats(p).grip,.68,1.7);};
 function loseSpin(r,p,amount,source){
  if(!p.alive||amount<=0)return;
  const t=TOP_BY_ID[p.top];
- const scale=clamp(1.15-(t.e-4)*.045-(t.type==='速度'?.22:0)-(p.fortressUntil>r.age?.18:0)-(p.input.guard?.12:0),.5,1.3);
- const loss=amount*scale;
+ let scale=clamp(1.15-(t.e-4)*.045-(t.type==='速度'?.18:0)-(p.fortressUntil>r.age?.18:0)-(p.input.guard?.12:0),.5,1.3);
+ // Triangle of counters: attack destabilizes heavy defense, speed outmaneuvers attack,
+ // and stable defensive rims punish reckless speed impacts. This supplements real momentum.
+ if(source&&source!==p){
+  const attacker=TOP_BY_ID[source.top]?.type;
+  if(t.type==='防禦'&&attacker==='攻擊')scale*=1.65;
+  if(t.type==='攻擊'&&attacker==='速度')scale*=1.32;
+  if(t.type==='速度'&&attacker==='防禦')scale*=1.12;
+ }
+ // Prototype tuning, all unlocks are freely available. Applied to rotational recoil only.
+ const tuning={golem:1.12,glacier:1.1,behemoth:1.09,raptor:.78,lynx:.77,leviathan:.88,unicorn:.94,mantis:.94};
+ const loss=amount*scale*partStats(p).spinDrain*(tuning[p.top]||1);
  p.spin=Math.max(0,p.spin-loss);
- p.wobble=clamp(p.wobble+loss*(1.05-(t.d-4)*.035),0,100);
+ p.wobble=clamp(p.wobble+loss*(1.05-(t.d-4)*.035)*(1-partStats(p).stability),0,100);
  p.impact=.35;
  if(source&&source!==p){p.lastHit=source.name;p.lastHitAt=r.age;}
  if(p.spin<=1.5)ko(r,p,'停止轉動');
@@ -137,7 +174,7 @@ function kick(r,src,p,force,spinLoss=0){
  const dx=p.x-src.x,dy=p.y-src.y,d=Math.max(1,dist(dx,dy));
  const nx=dx/d,ny=dy/d;
  const impulse=force/(massOf(p)*(p.fortressUntil>r.age?1.45:1));
- p.vx+=nx*impulse;p.vy+=ny*impulse;p.edgeKick=Math.max(p.edgeKick,impulse);
+ p.knockX+=nx*impulse;p.knockY+=ny*impulse;p.edgeKick=Math.max(p.edgeKick,impulse);
  if(spinLoss)loseSpin(r,p,spinLoss,src);
 }
 function skill(r,p){
@@ -166,10 +203,23 @@ function skill(r,p){
  }
  event(r,'skill',`${p.name} · ${t.skill}！`,p.id,0);
 }
+// Visible bounce pillars and channel entrances. Same geometry is sent to the browser.
+function arenaFeatures(r){
+ const pillars=({colosseum:[[0,-125,16],[0,125,16]],vortex:[[-113,-87,17],[113,87,17],[-113,87,15],[113,-87,15]],tempest:[[0,-132,18],[0,132,18]],volcano:[[-116,-108,20],[116,108,20]],eclipse:[[-98,0,17],[98,0,17]]})[r.arena]||[];
+ return {pillars:pillars.map(([x,y,radius])=>({x,y,r:radius})),lanes:boundRadius(r)>198,exitAngles:[-Math.PI/2,Math.PI/2],laneAngles:[0,Math.PI]};
+}
+function nearAngle(a,target,limit){return Math.abs(Math.atan2(Math.sin(a-target),Math.cos(a-target)))<limit;}
+function pillarCollision(r,p,ob){
+ const dx=p.x-ob.x,dy=p.y-ob.y,d=Math.hypot(dx,dy),min=DISC_R+ob.r;
+ if(d>=min||d<.001||p.railTimer>0)return;
+ const nx=dx/d,ny=dy/d,overlap=min-d;p.x+=nx*overlap;p.y+=ny*overlap;
+ const speedX=p.vx+p.knockX,speedY=p.vy+p.knockY,approach=-(speedX*nx+speedY*ny);
+ if(approach>0){const rebound=approach*1.85;p.knockX+=nx*rebound;p.knockY+=ny*rebound;p.edgeKick=Math.max(p.edgeKick,rebound*.65);loseSpin(r,p,rebound*.0035);if(r.age-(p.lastBumper||-10)>.28){p.lastBumper=r.age;event(r,'wall','防撞墩強力反彈！',p.id,Math.round(rebound),{x:p.x,y:p.y});}}
+}
 function boundRadius(r){
  const natural=r.arena==='eclipse'?235-60*clamp((r.age-12)/75,0,1):235;
  // Every arena closes late to force physical contact; no HP/timeout damage.
- const final=135*clamp((r.age-48)/47,0,1);
+ const final=55*clamp((r.age-37)/38,0,1);
  return natural-final;
 }
 function applyArena(r,p,dt){
@@ -203,52 +253,86 @@ function updateAI(r,p,dt){
  if(p.cool<=0&&p.spin>24&&Math.random()<dt*.22)skill(r,p);
 }
 function arenaEdge(r,p){
+ if(p.railTimer>0)return;
  const dd=dist(p.x,p.y);if(dd<1)return;
- const safe=Math.max(45,boundRadius(r)-DISC_R);
+ const safe=Math.max(65,boundRadius(r)-DISC_R);
  if(dd<safe)return;
- const nx=p.x/dd,ny=p.y/dd,rv=p.vx*nx+p.vy*ny;
- // A high-speed throw exits the bowl. A slow top rides the sloped rim and bounces back.
- if((dd>safe+10&&p.edgeKick>40)||(rv>55&&p.edgeKick>55&&dd>=safe)){ko(r,p,'擊出場外');return;}
- const overlap=dd-safe;p.x-=nx*overlap;p.y-=ny*overlap;
- if(rv>0){
-  const restitution=rv>100?.55:.83;
-  p.vx-=(1+restitution)*rv*nx;p.vy-=(1+restitution)*rv*ny;
-  loseSpin(r,p,(rv/140)**2*.9);
+ const nx=p.x/dd,ny=p.y/dd,angle=Math.atan2(ny,nx);
+ const vx=p.vx+p.knockX,vy=p.vy+p.knockY;
+ const outward=vx*nx+vy*ny;const speed=dist(vx,vy);
+ const features=arenaFeatures(r);
+ // Original re-entry lanes: a fast top entering left/right is accelerated round the outer rim.
+ if(features.lanes&&p.railCooldown<=0&&outward>65&&speed>90&&features.laneAngles.some(a=>nearAngle(angle,a,.25))){
+  p.railTimer=1.0;p.railCooldown=5;p.railAngle=angle;p.railSign=(p.y>=0?1:-1);p.knockX=0;p.knockY=0;
+  event(r,'rail',`${p.name} 沿外圈加速通道衝刺回場！`,p.id,Math.round(speed),{x:p.x,y:p.y});return;
+ }
+ // Only dangerous exit pockets can eject a top; guarded walls physically rebound.
+ if(features.exitAngles.some(a=>nearAngle(angle,a,r.arena==='volcano'?.34:.24))&&outward>90&&p.edgeKick>48&&dd>safe+.4){
+  ko(r,p,'擊出場外');return;
+ }
+ p.x-=nx*(dd-safe);p.y-=ny*(dd-safe);
+ if(outward>0){
+  const restitution=.83;const bounce=(1+restitution)*outward;
+  p.knockX-=bounce*nx;p.knockY-=bounce*ny;
+  p.edgeKick=Math.max(p.edgeKick,bounce*.43);
+  loseSpin(r,p,Math.min(.75,outward*.002));
+  if(outward>65&&r.age-(p.lastWall||-10)>.27){p.lastWall=r.age;event(r,'wall','護欄反彈！',p.id,Math.round(outward),{x:p.x,y:p.y});}
  }
 }
+function updateRail(r,p,dt){
+ p.railTimer=Math.max(0,p.railTimer-dt);
+ if(p.railTimer>0){
+  const progress=1-p.railTimer/1.0;
+  const sweep=1.12*progress*p.railSign;
+  const a=p.railAngle+sweep,trackR=boundRadius(r)+18;
+  p.x=Math.cos(a)*trackR;p.y=Math.sin(a)*trackR;p.vx=0;p.vy=0;
+  p.spin=Math.max(2,p.spin-dt*.55);
+ }else{
+  const a=p.railAngle+1.12*p.railSign;
+  const inward=-215*partStats(p).rail;
+  const tangent=120*p.railSign*partStats(p).rail;
+  p.x=Math.cos(a)*(boundRadius(r)-DISC_R-5);
+  p.y=Math.sin(a)*(boundRadius(r)-DISC_R-5);
+  p.vx=Math.cos(a)*inward-Math.sin(a)*tangent;
+  p.vy=Math.sin(a)*inward+Math.cos(a)*tangent;
+  p.knockX=0;p.knockY=0;
+  event(r,'return',`${p.name} 高速回場！`,p.id,Math.round(dist(p.vx,p.vy)),{x:p.x,y:p.y});
+ }
+}
+
 function collide(r,a,b){
- if(!a.alive||!b.alive||a.phaseUntil>r.age||b.phaseUntil>r.age)return;
+ if(!a.alive||!b.alive||a.railTimer>0||b.railTimer>0||a.phaseUntil>r.age||b.phaseUntil>r.age)return;
  const dx=b.x-a.x,dy=b.y-a.y,d=dist(dx,dy),limit=DISC_R*2;
  if(d>=limit)return;
  const nx=d>1e-6?dx/d:1,ny=d>1e-6?dy/d:0;
  const ma=massOf(a),mb=massOf(b),invA=1/ma,invB=1/mb,overlap=limit-d;
  a.x-=nx*overlap*invA/(invA+invB);a.y-=ny*overlap*invA/(invA+invB);
  b.x+=nx*overlap*invB/(invA+invB);b.y+=ny*overlap*invB/(invA+invB);
- const rvx=b.vx-a.vx,rvy=b.vy-a.vy,closing=-(rvx*nx+rvy*ny);
+ const rvx=b.vx+b.knockX-a.vx-a.knockX,rvy=b.vy+b.knockY-a.vy-a.knockY,closing=-(rvx*nx+rvy*ny);
  if(closing<12)return;
  const ta=TOP_BY_ID[a.top],tb=TOP_BY_ID[b.top];
  const attackA=(ta.a-4)*.042+(a.bladeUntil>r.age?.20:0);
  const attackB=(tb.a-4)*.042+(b.bladeUntil>r.age?.20:0);
- const restitution=clamp(.8+(attackA+attackB)*.32,.68,1.12);
+ const restitution=clamp(.91+(attackA+attackB)*.24,.84,1.09);
  const impulse=(1+restitution)*closing/(invA+invB);
  const impactToA=impulse*invA*(1+Math.max(0,attackB)*.42)*(a.fortressUntil>r.age?.56:1),impactToB=impulse*invB*(1+Math.max(0,attackA)*.42)*(b.fortressUntil>r.age?.56:1);
- a.vx-=nx*impactToA;a.vy-=ny*impactToA;a.edgeKick=Math.max(a.edgeKick,impactToA);
- b.vx+=nx*impactToB;b.vy+=ny*impactToB;b.edgeKick=Math.max(b.edgeKick,impactToB);
+ a.knockX-=nx*impactToA;a.knockY-=ny*impactToA;a.edgeKick=Math.max(a.edgeKick,impactToA);
+ b.knockX+=nx*impactToB;b.knockY+=ny*impactToB;b.edgeKick=Math.max(b.edgeKick,impactToB);
  // Spin generates rim friction. The lateral kick bends the trajectory after contact.
  const tangentX=-ny,tangentY=nx;
  const slip=rvx*tangentX+rvy*tangentY;
  const tangential=clamp(slip*.12 + (a.spin-b.spin)*.15,-60,60);
- a.vx+=tangentX*tangential*invA/(invA+invB)*.28;
- a.vy+=tangentY*tangential*invA/(invA+invB)*.28;
- b.vx-=tangentX*tangential*invB/(invA+invB)*.28;
- b.vy-=tangentY*tangential*invB/(invA+invB)*.28;
- const collisionEnergy=closing*closing/20000;
+ a.knockX+=tangentX*tangential*invA/(invA+invB)*.28;
+ a.knockY+=tangentY*tangential*invA/(invA+invB)*.28;
+ b.knockX-=tangentX*tangential*invB/(invA+invB)*.28;
+ b.knockY-=tangentY*tangential*invB/(invA+invB)*.28;
+ const collisionEnergy=closing*closing/3500;
  const guardA=a.input.guard? .65:1,guardB=b.input.guard? .65:1;
- loseSpin(r,a,collisionEnergy*guardA*(mb/ma)*.20*clamp(1-(ta.a-tb.a)*.14-(ta.s-5)*.2,.22,1.75),b);
- loseSpin(r,b,collisionEnergy*guardB*(ma/mb)*.20*clamp(1-(tb.a-ta.a)*.14-(tb.s-5)*.2,.22,1.75),a);
+ loseSpin(r,a,collisionEnergy*guardA*(mb/ma)*.20*clamp(1-(ta.a-tb.a)*.10-(ta.s-5)*.13,.62,1.55),b);
+ loseSpin(r,b,collisionEnergy*guardB*(ma/mb)*.20*clamp(1-(tb.a-ta.a)*.10-(tb.s-5)*.13,.62,1.55),a);
  const key=[a.id,b.id].sort().join(':'),last=r.hitPairs.get(key)||-10;
  if(r.age-last>.22){r.hitPairs.set(key,r.age);
-  event(r,'hit',`${a.name} ⚡ ${b.name} · ${Math.round(closing)} 衝擊速度`,a.id,Math.round(closing));
+  event(r,'hit',`${a.name} ⚡ ${b.name} · ${Math.round(closing)} 衝擊速度`,a.id,Math.round(closing),{x:(a.x+b.x)/2,y:(a.y+b.y)/2});
  }
 }
 function tickRoom(r,dt){
@@ -258,27 +342,29 @@ function tickRoom(r,dt){
  for(const p of r.fighters){
   if(!p.alive)continue;
   if(p.bot)updateAI(r,p,dt);
-  p.cool=Math.max(0,p.cool-dt);p.impact=Math.max(0,p.impact-dt);p.edgeKick=Math.max(0,p.edgeKick-25*dt);
+  p.cool=Math.max(0,p.cool-dt);p.railCooldown=Math.max(0,p.railCooldown-dt);p.impact=Math.max(0,p.impact-dt);p.edgeKick=Math.max(0,p.edgeKick-25*dt);
  }
  const step=dt/3;
  for(let sub=0;sub<3;sub++){
   for(const p of r.fighters){
    if(!p.alive)continue;
+   if(p.railTimer>0){updateRail(r,p,step);continue;}
    const t=TOP_BY_ID[p.top],inp=p.input,n=Math.max(1,dist(inp.x,inp.y));
    const mass=massOf(p);
-   const steering=(85+t.s*13)*(p.boostUntil>r.age?1.55:1)*(p.slowUntil>r.age?.6:1)*(p.stunUntil>r.age?.35:1);
-   const force=(380+t.s*54)/(mass*.8);
+   const steering=(105+t.s*17)*(p.boostUntil>r.age?1.55:1)*(p.slowUntil>r.age?.6:1)*(p.stunUntil>r.age?.35:1)*partStats(p).drive;
+   const force=(165+t.s*25)/(mass*.8)*partStats(p).control;
    // Controller changes heading with finite force; it does not teleport velocities.
    p.vx+=(inp.x/n*steering-p.vx)*Math.min(1,force/100*step*(p.input.guard?.38:1));
    p.vy+=(inp.y/n*steering-p.vy)*Math.min(1,force/100*step*(p.input.guard?.38:1));
    // Low spin becomes unstable; wobble increases floor friction.
    const drag=(.12+(100-p.spin)*.0018+p.wobble*.006)/gripOf(p);
-   p.vx*=Math.max(0,1-drag*step);p.vy*=Math.max(0,1-drag*step);
+   p.vx*=Math.max(0,1-drag*step);p.vy*=Math.max(0,1-drag*step);p.knockX*=Math.max(0,1-1.55*step);p.knockY*=Math.max(0,1-1.55*step);
    applyArena(r,p,step);
-   p.x+=p.vx*step;p.y+=p.vy*step;
-   p.spin-=step*(.62+(6-t.e)*.03+(p.input.guard?.25:0)+(p.wobble*.006)+(p.bladeUntil>r.age?.1:0));
+   p.x+=(p.vx+p.knockX)*step;p.y+=(p.vy+p.knockY)*step;
+   p.spin-=step*(1.65+(6-t.e)*.06+(p.input.guard?.25:0)+(p.wobble*.006)+(p.bladeUntil>r.age?.1:0))*partStats(p).spinDrain;
    p.wobble=Math.max(0,p.wobble-step*(1.8+t.d*.33));
    if(p.spin<=1.5){p.spin=0;ko(r,p,'停止轉動');continue;}
+   for(const ob of arenaFeatures(r).pillars)pillarCollision(r,p,ob);
    arenaEdge(r,p);
   }
   if(r.status!=='playing')break;
@@ -286,18 +372,18 @@ function tickRoom(r,dt){
   for(let i=0;i<alive.length;i++)for(let j=i+1;j<alive.length;j++)collide(r,alive[i],alive[j]);
   if(r.status!=='playing')break;
   // The last collision can eject a top over the rim in the same simulation step.
-  for(const p of alive)if(p.alive)arenaEdge(r,p);
+  for(const p of alive)if(p.alive&&p.railTimer<=0)arenaEdge(r,p);
   if(r.status!=='playing')break;
  }
  if(r.status!=='playing')return;
- if(r.age>=95){
+ if(r.age>=75){
   const alive=r.fighters.filter(p=>p.alive).sort((a,b)=>b.spin-a.spin||a.wobble-b.wobble);
   if(alive.length>1){const winner=alive[0];for(const p of alive)if(p!==winner){p.alive=false;p.koReason='時間到：轉速判定';}}
   finish(r);return;
  }
  if(r.fighters.filter(p=>p.alive).length<=1)finish(r);
 }
-function snapshot(r){return {t:'tick',time:Math.round(r.age*10)/10,radius:boundRadius(r),arena:r.arena,fighters:r.fighters.map(p=>({id:p.id,name:p.name,top:p.top,bot:p.bot,x:Math.round(p.x*10)/10,y:Math.round(p.y*10)/10,vx:Math.round(p.vx),vy:Math.round(p.vy),spin:Math.max(0,Math.round(p.spin)),wobble:Math.round(p.wobble),alive:p.alive,reason:p.koReason,cool:+p.cool.toFixed(1),shield:p.input.guard||p.fortressUntil>r.age,phase:p.phaseUntil>r.age,boost:p.boostUntil>r.age,blade:p.bladeUntil>r.age,slow:p.slowUntil>r.age,impact:p.impact>0,skillCount:p.skillCount}))};}
+function snapshot(r){return {t:'tick',time:Math.round(r.age*10)/10,radius:boundRadius(r),geometry:arenaFeatures(r),arena:r.arena,fighters:r.fighters.map(p=>({id:p.id,name:p.name,top:p.top,build:p.build,rail:p.railTimer>0,bot:p.bot,x:Math.round(p.x*10)/10,y:Math.round(p.y*10)/10,vx:Math.round(p.vx+p.knockX),vy:Math.round(p.vy+p.knockY),spin:Math.max(0,Math.round(p.spin)),wobble:Math.round(p.wobble),alive:p.alive,reason:p.koReason,cool:+p.cool.toFixed(1),shield:p.input.guard||p.fortressUntil>r.age,phase:p.phaseUntil>r.age,boost:p.boostUntil>r.age,blade:p.bladeUntil>r.age,slow:p.slowUntil>r.age,impact:p.impact>0,skillCount:p.skillCount}))};}
 function handle(ws,msg){if(!msg||typeof msg!=='object'||typeof msg.t!=='string')return;const r=ws.room;
  switch(msg.t){
   case 'resume':return resume(ws,msg.token);
@@ -305,7 +391,7 @@ function handle(ws,msg){if(!msg||typeof msg!=='object'||typeof msg.t!=='string')
   case 'create':return createRoom(ws,msg,null);
   case 'join':return createRoom(ws,msg,msg.code);
   case 'leave':return exitRoom(ws);
-  case 'set':if(!r||r.status!=='lobby')return;{const p=r.players.find(p=>p.id===ws.id);if(p){if(TOP_BY_ID[msg.top])p.top=msg.top;if(msg.name)p.name=safeName(msg.name);updateLobby(r);}}return;
+  case 'set':if(!r||r.status!=='lobby')return;{const p=r.players.find(p=>p.id===ws.id);if(p){if(TOP_BY_ID[msg.top])p.top=msg.top;if(msg.build)p.build=validBuild(msg.build);if(msg.name)p.name=safeName(msg.name);updateLobby(r);}}return;
   case 'arena':if(!r||r.host!==ws.id||r.status!=='lobby'||!ARENA_IDS.has(msg.id))return; r.arena=msg.id;return updateLobby(r);
   case 'bots':if(!r||r.host!==ws.id||r.status!=='lobby')return;r.bots=clamp(Math.floor(Number(msg.count)||0),0,MAX_PLAYERS-r.players.filter(p=>!p.bot).length);return updateLobby(r);
   case 'start':if(!r||r.host!==ws.id)return;return start(r);
@@ -325,7 +411,7 @@ function parseFrames(ws,chunk){ws.buffer=Buffer.concat([ws.buffer,chunk]);if(ws.
  } }
 const mime={'.webmanifest':'application/manifest+json','.png':'image/png','.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.ico':'image/x-icon'};
 const server=http.createServer((req,res)=>{
-  if(req.url==='/health'){res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({ok:true,game:'spin-break-arena',version:'3.0',rooms:rooms.size,uptime:Math.round(process.uptime())}));return;}
+  if(req.url==='/health'){res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({ok:true,game:'spin-break-arena',version:'4.0',rooms:rooms.size,uptime:Math.round(process.uptime())}));return;}
   if(req.method!=='GET'&&req.method!=='HEAD'){res.writeHead(405);res.end('Method not allowed');return;}
   let uri;try{uri=decodeURIComponent((req.url||'/').split('?')[0]);}catch{res.writeHead(400);res.end('Invalid path');return;}const file=path.resolve(ROOT,'.'+(uri==='/'?'/index.html':uri));
   if(!file.startsWith(ROOT+path.sep)){res.writeHead(403);res.end();return;}
@@ -340,7 +426,7 @@ server.on('upgrade',(req,sock,head)=>{
   sock.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: '+key+'\r\n\r\n');
   const ws={id:'P'+(++nextClient),sock,closed:false,buffer:Buffer.alloc(0),room:null,rateStart:now(),rateCount:0};sockets.add(ws);
   sock.on('data',c=>{if(!ws.closed)parseFrames(ws,c);});sock.on('close',()=>disconnect(ws));sock.on('error',()=>disconnect(ws));sock.setNoDelay(true);if(head.length)parseFrames(ws,head);
-  send(ws,{t:'hello',id:ws.id,tops:TOPS,arenas:ARENAS,version:'3.0'});
+  send(ws,{t:'hello',id:ws.id,tops:TOPS,arenas:ARENAS,parts:PARTS,version:'4.0'});
 });
 if (require.main === module) {
   setInterval(()=>{for(const r of rooms.values())if(r.status==='playing')tickRoom(r,DT);},1000/TPS);
@@ -349,4 +435,4 @@ if (require.main === module) {
   server.listen(PORT,HOST,()=>console.log(`[SPIN//BREAK] http://localhost:${PORT} | WebSocket /ws | 免安裝外部套件`));
   process.on('SIGINT',()=>{server.close();process.exit(0);});
 }
-module.exports={TOPS,ARENAS,fightersFor,tickRoom,skill,start,snapshot,publicRoom,server};
+module.exports={TOPS,PARTS,ARENAS,fightersFor,tickRoom,skill,start,snapshot,publicRoom,server,massOf,arenaFeatures,arenaEdge,collide,validBuild};
