@@ -128,11 +128,11 @@ function createRoom(ws, msg, joinCode) {
 }
 function fightersFor(r){const members=r.players.filter(p=>!p.bot).map(p=>({...p}));const picks=TOPS.slice();for(let i=picks.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[picks[i],picks[j]]=[picks[j],picks[i]];}
   for(let i=0;i<r.bots;i++){members.push({id:'bot'+i,name:['烈焰','閃電','旋風'][i]+'機神',top:picks[(i+r.round*3)%picks.length].id,build:{ratchet:PARTS.ratchets[(i+r.round)%PARTS.ratchets.length].id,bit:PARTS.bits[(i*3+r.round)%PARTS.bits.length].id},bot:true});}
-  return members.map((p,i)=>{let a=2*Math.PI*i/members.length-Math.PI/2;return {...p,x:Math.cos(a)*157,y:Math.sin(a)*157,vx:Math.cos(a+Math.PI/2)*65,vy:Math.sin(a+Math.PI/2)*65,knockX:0,knockY:0,railTimer:0,railCooldown:0,railAngle:0,railSign:1,spin:100,wobble:0,koReason:'',edgeKick:0,alive:true,shield:false,cool:0,burstUntil:0,fortressUntil:0,phaseUntil:0,slowUntil:0,bladeUntil:0,boostUntil:0,stunUntil:0,edgeRisk:0,skillCount:0,impact:0,score:0,lastHit:null,lastHitAt:0,input:{x:0,y:0,guard:false},aiTimer:0,aiTarget:null};});
+  return members.map((p,i)=>{let a=2*Math.PI*i/members.length-Math.PI/2;return {...p,x:Math.cos(a)*157,y:Math.sin(a)*157,vx:Math.cos(a+Math.PI/2)*(i%2?-112:112)-Math.cos(a)*38,vy:Math.sin(a+Math.PI/2)*(i%2?-112:112)-Math.sin(a)*38,orbitSign:i%2?-1:1,orbitPhase:i*2.4,chargeCd:0,chargeUntil:0,knockX:0,knockY:0,railTimer:0,railCooldown:0,railAngle:0,railSign:1,spin:100,wobble:0,koReason:'',edgeKick:0,alive:true,shield:false,cool:0,burstUntil:0,fortressUntil:0,phaseUntil:0,slowUntil:0,bladeUntil:0,boostUntil:0,stunUntil:0,edgeRisk:0,skillCount:0,impact:0,score:0,lastHit:null,lastHitAt:0,input:{guard:false,targetId:null},aiTimer:0,aiTarget:null};});
 }
-function start(r){if(r.status!=='lobby')return;if(r.players.filter(x=>x.connected).length<1||r.players.some(x=>!x.connected))return;if(r.players.length+r.bots<2)return; r.round++;r.fighters=fightersFor(r);r.status='playing';r.age=0;r.results=null;r.hitPairs.clear();r.events=[];broadcast(r,{t:'room',room:publicRoom(r)});event(r,'start','BATTLE START!','',0);}
+function start(r){if(r.status!=='lobby')return;if(r.players.filter(x=>x.connected).length<1||r.players.some(x=>!x.connected))return;if(r.players.length+r.bots<2)return; r.round++;r.fighters=fightersFor(r);r.status='playing';r.age=0;r.results=null;r.hitPairs.clear();r.contactPairs=new Map();r.events=[];broadcast(r,{t:'room',room:publicRoom(r)});event(r,'start','BATTLE START!','',0);}
 function event(r,kind,msg,id,amount,extra={}){const e={t:'event',kind,msg,id,amount,...extra,seq:crypto.randomBytes(3).toString('hex')};r.events.push(e);if(r.events.length>12)r.events.shift();broadcast(r,e);}
-// V3: ring-out and spin-stop physics. There is no health, hit point or damage system.
+// V5: autonomous momentum & tactical charge; ring-out / spin-stop remain decisive.  There is no health, hit point or damage system.
 const DISC_R=22;
 const massOf=p=>{const t=TOP_BY_ID[p.top];return (1+(t.d-5)*.075+(t.type==='防禦'?.07:0))*partStats(p).mass;};
 const gripOf=p=>{const t=TOP_BY_ID[p.top];return clamp((.75+t.e*.055 + (p.input.guard?.18:0))*partStats(p).grip,.68,1.7);};
@@ -177,6 +177,30 @@ function kick(r,src,p,force,spinLoss=0){
  p.knockX+=nx*impulse;p.knockY+=ny*impulse;p.edgeKick=Math.max(p.edgeKick,impulse);
  if(spinLoss)loseSpin(r,p,spinLoss,src);
 }
+function chooseTarget(r,p,targetId){
+ const foes=r.fighters.filter(q=>q.alive&&q.id!==p.id&&q.railTimer<=0);
+ return foes.find(q=>q.id===targetId)||foes.sort((a,b)=>dist(a.x-p.x,a.y-p.y)-dist(b.x-p.x,b.y-p.y))[0]||null;
+}
+// Single-tap tactical movement, never continuous player steering.
+function charge(r,p,targetId){
+ if(!p.alive||p.railTimer>0||p.chargeCd>0||p.spin<11||p.stunUntil>r.age)return false;
+ const target=chooseTarget(r,p,targetId||p.input.targetId);
+ const t=TOP_BY_ID[p.top],part=partStats(p);
+ let dx=target?target.x-p.x: -p.y,dy=target?target.y-p.y:p.x;
+ // Lead a moving opponent; never trust client-supplied speed or impulse.
+ if(target){dx+=clamp(target.vx+target.knockX,-230,230)*.18;dy+=clamp(target.vy+target.knockY,-230,230)*.18;}
+ const norm=Math.max(1,dist(dx,dy));dx/=norm;dy/=norm;
+ const burst=(255+t.s*14)*clamp(part.drive,.66,1.24)/Math.sqrt(massOf(p));
+ p.knockX+=dx*burst;p.knockY+=dy*burst;
+ const speed=dist(p.vx+p.knockX,p.vy+p.knockY);
+ if(speed>610){const ratio=610/speed;p.vx*=ratio;p.vy*=ratio;p.knockX*=ratio;p.knockY*=ratio;}
+ p.chargeUntil=r.age+.88;
+ p.chargeCd=4.3+(t.type==='防禦'?.4:0);
+ p.spin-=3.6;p.wobble=clamp(p.wobble+1.2,0,100);
+ p.edgeKick=Math.max(p.edgeKick,burst*.38);
+ event(r,'charge',`${p.name} · 極限衝鋒！`,p.id,Math.round(burst),{x:p.x,y:p.y,targetId:target?.id||null});
+ return true;
+}
 function skill(r,p){
  if(!p.alive||p.cool>0||p.spin<13||p.stunUntil>r.age)return;
  const t=TOP_BY_ID[p.top];p.spin-=2.8;p.cool=t.cd;p.skillCount++;
@@ -185,9 +209,8 @@ function skill(r,p){
  switch(t.power){
   case 'blast':near(115,q=>kick(r,p,q,140,1.5));p.vx*=.9;p.vy*=.9;break;
   case 'dash':p.boostUntil=r.age+2.2;p.bladeUntil=r.age+2.2;{
-    const target=foes.sort((a,b)=>dist(a.x-p.x,a.y-p.y)-dist(b.x-p.x,b.y-p.y))[0];
-    let dx=p.input.x,dy=p.input.y,n=dist(dx,dy);
-    if(n<.2&&target){dx=target.x-p.x;dy=target.y-p.y;n=dist(dx,dy);}
+    const target=chooseTarget(r,p,p.input.targetId);
+    let dx=target?target.x-p.x:-p.y,dy=target?target.y-p.y:p.x,n=dist(dx,dy);
     n=Math.max(.001,n);p.vx+=dx/n*178;p.vy+=dy/n*178;
   }break;
   case 'blade':p.bladeUntil=r.age+4.5;p.boostUntil=r.age+1.5;break;
@@ -237,21 +260,16 @@ function applyArena(r,p,dt){
 }
 function updateAI(r,p,dt){
  p.aiTimer-=dt;
- if(p.aiTimer<=0){p.aiTimer=rnd(.24,.48);
+ if(p.aiTimer<=0){
+  p.aiTimer=rnd(.35,.85);
   const foes=r.fighters.filter(q=>q.alive&&q.id!==p.id);
-  const target=foes.sort((a,b)=>dist(a.x-p.x,a.y-p.y)-dist(b.x-p.x,b.y-p.y))[0];
-  if(target){
-   const dx=target.x-p.x,dy=target.y-p.y,n=dist(dx,dy)||1,edge=dist(p.x,p.y);
-   const aggression=Math.random();
-   const lead=.16;
-   p.input.x=(dx+target.vx*lead)/n*(aggression<.83?1:.38)-dy/n*rnd(-.18,.18);
-   p.input.y=(dy+target.vy*lead)/n*(aggression<.83?1:.38)+dx/n*rnd(-.18,.18);
-   if(edge>165){const nx=(p.x+p.vx*.22)/Math.max(1,dist(p.x+p.vx*.22,p.y+p.vy*.22));const ny=(p.y+p.vy*.22)/Math.max(1,dist(p.x+p.vx*.22,p.y+p.vy*.22)); const factor=clamp((edge-165)/75,0,1.9);p.input.x-=nx*factor;p.input.y-=ny*factor;}
-  }
-  p.input.guard=Math.random()<.13;
+  p.input.targetId=foes.length?foes[Math.floor(Math.random()*foes.length)].id:null;
+  p.input.guard=Math.random()<.1;
  }
- if(p.cool<=0&&p.spin>24&&Math.random()<dt*.22)skill(r,p);
+ if(p.chargeCd<=0&&p.spin>15&&Math.random()<dt*.42)charge(r,p,p.input.targetId);
+ if(p.cool<=0&&p.spin>24&&Math.random()<dt*.20)skill(r,p);
 }
+
 function arenaEdge(r,p){
  if(p.railTimer>0)return;
  const dd=dist(p.x,p.y);if(dd<1)return;
@@ -306,35 +324,47 @@ function collide(r,a,b){
  if(d>=limit)return;
  const nx=d>1e-6?dx/d:1,ny=d>1e-6?dy/d:0;
  const ma=massOf(a),mb=massOf(b),invA=1/ma,invB=1/mb,overlap=limit-d;
- a.x-=nx*overlap*invA/(invA+invB);a.y-=ny*overlap*invA/(invA+invB);
- b.x+=nx*overlap*invB/(invA+invB);b.y+=ny*overlap*invB/(invA+invB);
- const rvx=b.vx+b.knockX-a.vx-a.knockX,rvy=b.vy+b.knockY-a.vy-a.knockY,closing=-(rvx*nx+rvy*ny);
- if(closing<12)return;
+ // Correct penetration fully, with a small skin so tops do not remain touching.
+ const shift=(overlap+1.1)/(invA+invB);
+ a.x-=nx*shift*invA;a.y-=ny*shift*invA;
+ b.x+=nx*shift*invB;b.y+=ny*shift*invB;
+ const rvx=b.vx+b.knockX-a.vx-a.knockX,rvy=b.vy+b.knockY-a.vy-a.knockY;
+ const closing=-(rvx*nx+rvy*ny);
+ const key=[a.id,b.id].sort().join(':'),lastContact=r.contactPairs?.get(key)??-100;
+ // One impact per brief contact: repeated overlap does not drain spin or stick together.
+ if(r.age-lastContact<.12)return;
+ if(closing<10){
+  if(overlap>2){a.knockX-=nx*35*invA;a.knockY-=ny*35*invA;b.knockX+=nx*35*invB;b.knockY+=ny*35*invB;}
+  return;
+ }
+ (r.contactPairs??(r.contactPairs=new Map())).set(key,r.age);
  const ta=TOP_BY_ID[a.top],tb=TOP_BY_ID[b.top];
- const attackA=(ta.a-4)*.042+(a.bladeUntil>r.age?.20:0);
- const attackB=(tb.a-4)*.042+(b.bladeUntil>r.age?.20:0);
- const restitution=clamp(.91+(attackA+attackB)*.24,.84,1.09);
+ const armedA=a.chargeUntil>r.age,armedB=b.chargeUntil>r.age;
+ const restitution=clamp(1.04+(ta.a+tb.a-10)*.014+((armedA||armedB)?.12:0),.97,1.28);
  const impulse=(1+restitution)*closing/(invA+invB);
- const impactToA=impulse*invA*(1+Math.max(0,attackB)*.42)*(a.fortressUntil>r.age?.56:1),impactToB=impulse*invB*(1+Math.max(0,attackA)*.42)*(b.fortressUntil>r.age?.56:1);
- a.knockX-=nx*impactToA;a.knockY-=ny*impactToA;a.edgeKick=Math.max(a.edgeKick,impactToA);
- b.knockX+=nx*impactToB;b.knockY+=ny*impactToB;b.edgeKick=Math.max(b.edgeKick,impactToB);
- // Spin generates rim friction. The lateral kick bends the trajectory after contact.
- const tangentX=-ny,tangentY=nx;
- const slip=rvx*tangentX+rvy*tangentY;
- const tangential=clamp(slip*.12 + (a.spin-b.spin)*.15,-60,60);
- a.knockX+=tangentX*tangential*invA/(invA+invB)*.28;
- a.knockY+=tangentY*tangential*invA/(invA+invB)*.28;
- b.knockX-=tangentX*tangential*invB/(invA+invB)*.28;
- b.knockY-=tangentY*tangential*invB/(invA+invB)*.28;
- const collisionEnergy=closing*closing/3500;
- const guardA=a.input.guard? .65:1,guardB=b.input.guard? .65:1;
- loseSpin(r,a,collisionEnergy*guardA*(mb/ma)*.20*clamp(1-(ta.a-tb.a)*.10-(ta.s-5)*.13,.62,1.55),b);
- loseSpin(r,b,collisionEnergy*guardB*(ma/mb)*.20*clamp(1-(tb.a-ta.a)*.10-(tb.s-5)*.13,.62,1.55),a);
- const key=[a.id,b.id].sort().join(':'),last=r.hitPairs.get(key)||-10;
- if(r.age-last>.22){r.hitPairs.set(key,r.age);
-  event(r,'hit',`${a.name} ⚡ ${b.name} · ${Math.round(closing)} 衝擊速度`,a.id,Math.round(closing),{x:(a.x+b.x)/2,y:(a.y+b.y)/2});
+ const impactToA=impulse*invA*(1+(armedB?.32:0))*(a.fortressUntil>r.age?.57:1);
+ const impactToB=impulse*invB*(1+(armedA?.32:0))*(b.fortressUntil>r.age?.57:1);
+ a.knockX-=nx*impactToA;a.knockY-=ny*impactToA;
+ b.knockX+=nx*impactToB;b.knockY+=ny*impactToB;
+ a.edgeKick=Math.max(a.edgeKick,impactToA);b.edgeKick=Math.max(b.edgeKick,impactToB);
+ const tangentX=-ny,tangentY=nx,slip=rvx*tangentX+rvy*tangentY;
+ const tangential=clamp(slip*.15+(a.spin-b.spin)*.15,-75,75);
+ a.knockX+=tangentX*tangential*invA/(invA+invB)*.40;
+ a.knockY+=tangentY*tangential*invA/(invA+invB)*.40;
+ b.knockX-=tangentX*tangential*invB/(invA+invB)*.40;
+ b.knockY-=tangentY*tangential*invB/(invA+invB)*.40;
+ const collisionEnergy=closing*closing/2900;
+ const guardA=a.input.guard?.65:1,guardB=b.input.guard?.65:1;
+ loseSpin(r,a,collisionEnergy*guardA*(mb/ma)*.20*clamp(1-(ta.a-tb.a)*.1-(ta.s-5)*.13,.62,1.55),b);
+ loseSpin(r,b,collisionEnergy*guardB*(ma/mb)*.20*clamp(1-(tb.a-ta.a)*.1-(tb.s-5)*.13,.62,1.55),a);
+ if(!a.alive||!b.alive)return;
+ a.stunUntil=Math.max(a.stunUntil,r.age+Math.min(.32,closing/1100));
+ b.stunUntil=Math.max(b.stunUntil,r.age+Math.min(.32,closing/1100));
+ if(r.age-(r.hitPairs.get(key)??-100)>.15){r.hitPairs.set(key,r.age);
+  event(r,'hit',`${a.name} ⚡ ${b.name} · ${Math.round(closing)} 衝擊速度`,a.id,Math.round(closing),{x:(a.x+b.x)/2,y:(a.y+b.y)/2,critical:armedA||armedB});
  }
 }
+
 function tickRoom(r,dt){
  if(r.status!=='playing')return;
  r.age+=dt;
@@ -342,23 +372,30 @@ function tickRoom(r,dt){
  for(const p of r.fighters){
   if(!p.alive)continue;
   if(p.bot)updateAI(r,p,dt);
-  p.cool=Math.max(0,p.cool-dt);p.railCooldown=Math.max(0,p.railCooldown-dt);p.impact=Math.max(0,p.impact-dt);p.edgeKick=Math.max(0,p.edgeKick-25*dt);
+  p.cool=Math.max(0,p.cool-dt);p.chargeCd=Math.max(0,p.chargeCd-dt);p.railCooldown=Math.max(0,p.railCooldown-dt);p.impact=Math.max(0,p.impact-dt);p.edgeKick=Math.max(0,p.edgeKick-25*dt);
  }
  const step=dt/3;
  for(let sub=0;sub<3;sub++){
   for(const p of r.fighters){
    if(!p.alive)continue;
    if(p.railTimer>0){updateRail(r,p,step);continue;}
-   const t=TOP_BY_ID[p.top],inp=p.input,n=Math.max(1,dist(inp.x,inp.y));
-   const mass=massOf(p);
-   const steering=(105+t.s*17)*(p.boostUntil>r.age?1.55:1)*(p.slowUntil>r.age?.6:1)*(p.stunUntil>r.age?.35:1)*partStats(p).drive;
-   const force=(165+t.s*25)/(mass*.8)*partStats(p).control;
-   // Controller changes heading with finite force; it does not teleport velocities.
-   p.vx+=(inp.x/n*steering-p.vx)*Math.min(1,force/100*step*(p.input.guard?.38:1));
-   p.vy+=(inp.y/n*steering-p.vy)*Math.min(1,force/100*step*(p.input.guard?.38:1));
-   // Low spin becomes unstable; wobble increases floor friction.
-   const drag=(.12+(100-p.spin)*.0018+p.wobble*.006)/gripOf(p);
-   p.vx*=Math.max(0,1-drag*step);p.vy*=Math.max(0,1-drag*step);p.knockX*=Math.max(0,1-1.55*step);p.knockY*=Math.max(0,1-1.55*step);
+   const t=TOP_BY_ID[p.top],mass=massOf(p),part=partStats(p);
+   // Uncontrolled orbital motion comes from the tip, stadium and inertia, not WASD.
+   // A very weak restoring force prevents idle tops simply stopping at the rim.
+   const d=Math.max(1,dist(p.x,p.y)),spinFactor=clamp(p.spin/100,.3,1);
+   const tangentialSpeed=(87+t.s*11)*part.drive*spinFactor*(p.boostUntil>r.age?1.48:1);
+   const radialForce=clamp((d-102)*.55,-42,96);
+   const phaseForce=Math.sin(r.age*1.25+p.orbitPhase)*22;
+   const targetVx=(-p.y/d*p.orbitSign*tangentialSpeed-p.x/d*radialForce)+(p.x/d*phaseForce);
+   const targetVy=(p.x/d*p.orbitSign*tangentialSpeed-p.y/d*radialForce)+(p.y/d*phaseForce);
+   const steering=p.stunUntil>r.age?.08:p.chargeUntil>r.age?.16:.45;
+   p.vx+=(targetVx-p.vx)*steering*step;
+   p.vy+=(targetVy-p.vy)*steering*step;
+   const drag=(.17+(100-p.spin)*.0014+p.wobble*.0055)/gripOf(p);
+   p.vx*=Math.max(0,1-drag*step);p.vy*=Math.max(0,1-drag*step);
+   p.knockX*=Math.max(0,1-.57*step);p.knockY*=Math.max(0,1-.57*step);
+   const full=dist(p.vx+p.knockX,p.vy+p.knockY);
+   if(full>730){const k=730/full;p.knockX*=k;p.knockY*=k;p.vx*=k;p.vy*=k;}
    applyArena(r,p,step);
    p.x+=(p.vx+p.knockX)*step;p.y+=(p.vy+p.knockY)*step;
    p.spin-=step*(1.65+(6-t.e)*.06+(p.input.guard?.25:0)+(p.wobble*.006)+(p.bladeUntil>r.age?.1:0))*partStats(p).spinDrain;
@@ -383,7 +420,7 @@ function tickRoom(r,dt){
  }
  if(r.fighters.filter(p=>p.alive).length<=1)finish(r);
 }
-function snapshot(r){return {t:'tick',time:Math.round(r.age*10)/10,radius:boundRadius(r),geometry:arenaFeatures(r),arena:r.arena,fighters:r.fighters.map(p=>({id:p.id,name:p.name,top:p.top,build:p.build,rail:p.railTimer>0,bot:p.bot,x:Math.round(p.x*10)/10,y:Math.round(p.y*10)/10,vx:Math.round(p.vx+p.knockX),vy:Math.round(p.vy+p.knockY),spin:Math.max(0,Math.round(p.spin)),wobble:Math.round(p.wobble),alive:p.alive,reason:p.koReason,cool:+p.cool.toFixed(1),shield:p.input.guard||p.fortressUntil>r.age,phase:p.phaseUntil>r.age,boost:p.boostUntil>r.age,blade:p.bladeUntil>r.age,slow:p.slowUntil>r.age,impact:p.impact>0,skillCount:p.skillCount}))};}
+function snapshot(r){return {t:'tick',time:Math.round(r.age*10)/10,radius:boundRadius(r),geometry:arenaFeatures(r),arena:r.arena,fighters:r.fighters.map(p=>({id:p.id,name:p.name,top:p.top,build:p.build,rail:p.railTimer>0,bot:p.bot,x:Math.round(p.x*10)/10,y:Math.round(p.y*10)/10,vx:Math.round(p.vx+p.knockX),vy:Math.round(p.vy+p.knockY),spin:Math.max(0,Math.round(p.spin)),wobble:Math.round(p.wobble),alive:p.alive,reason:p.koReason,cool:+p.cool.toFixed(1),chargeCd:+p.chargeCd.toFixed(1),charging:p.chargeUntil>r.age,shield:p.input.guard||p.fortressUntil>r.age,phase:p.phaseUntil>r.age,boost:p.boostUntil>r.age,blade:p.bladeUntil>r.age,slow:p.slowUntil>r.age,impact:p.impact>0,skillCount:p.skillCount}))};}
 function handle(ws,msg){if(!msg||typeof msg!=='object'||typeof msg.t!=='string')return;const r=ws.room;
  switch(msg.t){
   case 'resume':return resume(ws,msg.token);
@@ -396,7 +433,7 @@ function handle(ws,msg){if(!msg||typeof msg!=='object'||typeof msg.t!=='string')
   case 'bots':if(!r||r.host!==ws.id||r.status!=='lobby')return;r.bots=clamp(Math.floor(Number(msg.count)||0),0,MAX_PLAYERS-r.players.filter(p=>!p.bot).length);return updateLobby(r);
   case 'start':if(!r||r.host!==ws.id)return;return start(r);
   case 'again':if(!r||r.host!==ws.id||r.status!=='results')return;r.status='lobby';r.fighters=[];r.results=null;return updateLobby(r);
-  case 'input':if(!r||r.status!=='playing')return;{const p=r.fighters.find(p=>p.id===ws.id);if(!p||!p.alive)return;p.input.x=clamp(Number(msg.x)||0,-1,1);p.input.y=clamp(Number(msg.y)||0,-1,1);p.input.guard=!!msg.guard;if(msg.burst)skill(r,p);}return;
+  case 'input':if(!r||r.status!=='playing')return;{const p=r.fighters.find(p=>p.id===ws.id);if(!p||!p.alive)return;p.input.guard=false;if(typeof msg.targetId==='string')p.input.targetId=msg.targetId.slice(0,64);if(msg.charge)charge(r,p,p.input.targetId);if(msg.burst)skill(r,p);}return;
  }
 }
 // RFC 6455 WebSocket framing (masked client frames, fragmented frame support omitted intentionally).
@@ -411,7 +448,7 @@ function parseFrames(ws,chunk){ws.buffer=Buffer.concat([ws.buffer,chunk]);if(ws.
  } }
 const mime={'.webmanifest':'application/manifest+json','.png':'image/png','.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.ico':'image/x-icon'};
 const server=http.createServer((req,res)=>{
-  if(req.url==='/health'){res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({ok:true,game:'spin-break-arena',version:'4.0',rooms:rooms.size,uptime:Math.round(process.uptime())}));return;}
+  if(req.url==='/health'){res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({ok:true,game:'spin-break-arena',version:'5.0',rooms:rooms.size,uptime:Math.round(process.uptime())}));return;}
   if(req.method!=='GET'&&req.method!=='HEAD'){res.writeHead(405);res.end('Method not allowed');return;}
   let uri;try{uri=decodeURIComponent((req.url||'/').split('?')[0]);}catch{res.writeHead(400);res.end('Invalid path');return;}const file=path.resolve(ROOT,'.'+(uri==='/'?'/index.html':uri));
   if(!file.startsWith(ROOT+path.sep)){res.writeHead(403);res.end();return;}
@@ -426,7 +463,7 @@ server.on('upgrade',(req,sock,head)=>{
   sock.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: '+key+'\r\n\r\n');
   const ws={id:'P'+(++nextClient),sock,closed:false,buffer:Buffer.alloc(0),room:null,rateStart:now(),rateCount:0};sockets.add(ws);
   sock.on('data',c=>{if(!ws.closed)parseFrames(ws,c);});sock.on('close',()=>disconnect(ws));sock.on('error',()=>disconnect(ws));sock.setNoDelay(true);if(head.length)parseFrames(ws,head);
-  send(ws,{t:'hello',id:ws.id,tops:TOPS,arenas:ARENAS,parts:PARTS,version:'4.0'});
+  send(ws,{t:'hello',id:ws.id,tops:TOPS,arenas:ARENAS,parts:PARTS,version:'5.0'});
 });
 if (require.main === module) {
   setInterval(()=>{for(const r of rooms.values())if(r.status==='playing')tickRoom(r,DT);},1000/TPS);
@@ -435,4 +472,4 @@ if (require.main === module) {
   server.listen(PORT,HOST,()=>console.log(`[SPIN//BREAK] http://localhost:${PORT} | WebSocket /ws | 免安裝外部套件`));
   process.on('SIGINT',()=>{server.close();process.exit(0);});
 }
-module.exports={TOPS,PARTS,ARENAS,fightersFor,tickRoom,skill,start,snapshot,publicRoom,server,massOf,arenaFeatures,arenaEdge,collide,validBuild};
+module.exports={TOPS,PARTS,ARENAS,fightersFor,tickRoom,skill,charge,start,snapshot,publicRoom,server,massOf,arenaFeatures,arenaEdge,collide,validBuild};

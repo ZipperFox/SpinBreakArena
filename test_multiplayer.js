@@ -15,9 +15,9 @@ async function run(){const checkHttp=await new Promise((resolve,reject)=>http.ge
  a.send({t:'start'});await Promise.all([a,b,c,d].map(x=>x.wait(m=>m.t==='room'&&m.room.status==='playing')));
  const snaps=await Promise.all([a,b,c,d].map(x=>x.wait(m=>m.t==='tick'&&Array.isArray(m.fighters)&&m.fighters.length===4)));
  assert(snaps.every(x=>x.fighters.length===4));const ids=snaps.map(x=>x.fighters.map(f=>f.id).sort().join(','));assert(ids.every(x=>x===ids[0]),'Players disagree on fighters');
- for(let n=0;n<15;n++){a.send({t:'input',x:1,y:0,burst:n===0});b.send({t:'input',x:-1,y:0,burst:n===0});c.send({t:'input',x:0,y:1,burst:n===0});d.send({t:'input',x:0,y:-1,burst:n===0});await new Promise(r=>setTimeout(r,55));}
- const after=await a.wait(m=>m.t==='tick'&&m.time>0.6);assert(after.fighters.every(f=>Number.isFinite(f.x)));assert(a.messages.some(m=>m.t==='event'&&m.kind==='skill'),'Skill event missing');
- console.log('✓ 4 real players connected and joined same room');console.log('✓ arena and lobby settings synchronized');console.log('✓ authoritative snapshots match across browsers');console.log('✓ movement packets and real skill triggered');
+ a.send({t:'input',charge:true,targetId:b.id});b.send({t:'input',burst:true});c.send({t:'input',charge:true,targetId:d.id});d.send({t:'input',burst:true});await new Promise(r=>setTimeout(r,800));
+ const after=await a.wait(m=>m.t==='tick'&&m.time>0.6);assert(after.fighters.every(f=>Number.isFinite(f.x)));assert(a.messages.some(m=>m.t==='event'&&m.kind==='skill'),'Skill event missing');assert(a.messages.some(m=>m.t==='event'&&m.kind==='charge'),'Charge event missing');
+ console.log('✓ 4 real players connected and joined same room');console.log('✓ arena and lobby settings synchronized');console.log('✓ authoritative snapshots match across browsers');console.log('✓ one-shot charges and special skills triggered');
  for(const x of [a,b,c,d])x.socket.close();
  const solo=await client('solo');await solo.wait(m=>m.t==='hello');solo.send({t:'create',name:'練習玩家',top:'lynx'});const r=await solo.wait(m=>m.t==='joined');assert.equal(r.room.bots,1);solo.send({t:'start'});await solo.wait(m=>m.t==='room'&&m.room.status==='playing');const snap=await solo.wait(m=>m.t==='tick'&&m.fighters.length===2);assert(snap.fighters.some(x=>x.bot));console.log('✓ solo practice with server-side AI opponent');solo.socket.close();console.log('ALL MULTIPLAYER TESTS PASS');}
 run().catch(err=>{console.error(err);process.exitCode=1;setTimeout(()=>process.exit(1),200);});

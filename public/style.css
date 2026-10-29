@@ -44,3 +44,13 @@
 .build-info strong{display:block;color:#ffc887;margin-bottom:3px;font-size:12px}
 .build-info span{color:#9db4cb}
 @media(max-width:720px){.customize-panel select{font-size:16px}.customize-panel{padding:14px}.touch-controller{padding-bottom:12px}}
+
+/* V5: charge-first tactical touch controls; no virtual steering surface. */
+.target-zone{pointer-events:auto;display:flex;flex-direction:column;justify-content:end;gap:7px;max-width:48%;}
+.target-zone span{font-size:11px;color:#bed8f1;text-shadow:0 1px 4px #000;line-height:1.2}
+.target-switch{border:1px solid #b5eff5;background:#0e264ad9;color:#f0fcff;border-radius:18px;padding:9px 13px;font-weight:800;font-size:12px;min-height:40px;max-width:210px}
+.touch-controller .touch-actions button{box-shadow:0 0 17px #d9734b77;min-width:76px;min-height:76px}
+.touch-controller .touch-guard{width:84px!important;height:84px!important;background:#c26a18!important;border-color:#ffd383!important;}
+.touch-controller .touch-guard small{color:#fff0cf}
+.touch-controller .touch-burst{width:84px;height:84px}
+@media(max-width:720px){.touch-controller{padding:0 9px 12px;align-items:end}.target-zone span{font-size:9px}.target-switch{font-size:10px;padding:8px;max-width:135px}.touch-controller .touch-actions{gap:6px}.touch-controller .touch-actions button{width:69px!important;height:69px!important;min-width:0!important;min-height:0!important;font-size:12px}.touch-controller .touch-actions small{font-size:9px}}

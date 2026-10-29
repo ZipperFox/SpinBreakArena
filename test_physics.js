@@ -63,4 +63,4 @@ function simulate(r,ticks=1){for(let i=0;i<ticks&&r.status==='playing';i++)tickR
  assert.notEqual(massOf({...make().fighters[0],build:a}),massOf({...make().fighters[0],build:b}));
  console.log('✓ 576 valid component combinations and server-side input validation');
 }
-console.log('ALL V4 PHYSICS TESTS PASS');
+console.log('ALL LEGACY PHYSICS TESTS PASS');

@@ -16,7 +16,7 @@ function client(label){
 }
 function get(path){return new Promise((resolve,reject)=>http.get('http://127.0.0.1:3000'+path,r=>{let str='';r.on('data',b=>str+=b);r.on('end',()=>resolve({code:r.statusCode,body:str,headers:r.headers}));}).on('error',reject));}
 async function run(){
- const health=await get('/health');assert.equal(health.code,200);assert.equal(JSON.parse(health.body).version,'4.0');
+ const health=await get('/health');assert.equal(health.code,200);assert.equal(JSON.parse(health.body).version,'5.0');
  const manifest=await get('/manifest.webmanifest');assert.equal(manifest.code,200);assert(manifest.headers['content-type'].includes('manifest+json'));
  const icon=await get('/icon-192.png');assert.equal(icon.code,200);
  const bad=await get('/../server.js');assert(bad.code===403||bad.code===404);
@@ -33,7 +33,8 @@ async function run(){
  a.send({t:'start'});await a.wait(x=>x.t==='room'&&x.room.status==='playing');
  {const tick=await b2.wait(x=>x.t==='tick'&&x.fighters.length===2);assert.equal(tick.fighters.find(x=>x.id===j.id).build.bit,'gear');assert(Array.isArray(tick.geometry.pillars));}
  const before=await b2.wait(x=>x.t==='tick'&&x.time>=0.3);
- b2.send({t:'input',x:1,y:1,burst:true});await b2.wait(x=>x.t==='event'&&x.kind==='skill');
+ b2.send({t:'input',charge:true,targetId:j.id});await b2.wait(x=>x.t==='event'&&x.kind==='charge');
+ b2.send({t:'input',burst:true});await b2.wait(x=>x.t==='event'&&x.kind==='skill');
  b2.socket.close();await a.wait(x=>x.t==='room'&&x.room.players.some(p=>p.id===jb.id&&p.connected===false));
  const b3=await client('guest-reconnect-match');await b3.wait(x=>x.t==='hello');b3.send({t:'resume',token:jb.token});
  const back=await b3.wait(x=>x.t==='joined'&&x.resumed);assert.equal(back.room.status,'playing');
@@ -47,6 +48,6 @@ async function run(){
  console.log('✓ reconnect before and during live match, including input & skill');
  console.log('✓ ping and new host assignment');
  for(const c of [a,b2,b3])c.socket.close();
- console.log('ALL V4 REMOTE TESTS PASS');
+ console.log('ALL V5 REMOTE TESTS PASS');
 }
 run().catch(e=>{console.error(e);process.exit(1);});

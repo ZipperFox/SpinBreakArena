@@ -1,7 +1,7 @@
 'use strict';
 (() => {
 const $ = id => document.getElementById(id);
-const els = Object.fromEntries(['roster','profile','topType','bigTop','topName','topSkill','topStats','statTotal','typeFilters','netDot','netState','btnSound','soundText','bladeSelect','ratchetSelect','bitSelect','buildInfo','stage','stageFrame','stageTitle','gameTimer','roundState','fightHud','centerOverlay','overlayPlay','impactBanner','eventToast','playerName','roomInput','btnCreate','btnJoin','roomMessage','lobbyHeading','lobbyStatus','roomCode','btnCopy','btnShare','participants','arenaSelect','arenaDescription','botCount','btnStart','btnAgain','btnLeave','scoreboard','combatLog','joyZone','joyKnob','touchBurst','touchGuard'].map(x=>[x,$(x)]));
+const els = Object.fromEntries(['roster','profile','topType','bigTop','topName','topSkill','topStats','statTotal','typeFilters','netDot','netState','btnSound','soundText','bladeSelect','ratchetSelect','bitSelect','buildInfo','stage','stageFrame','stageTitle','gameTimer','roundState','fightHud','centerOverlay','overlayPlay','impactBanner','eventToast','playerName','roomInput','btnCreate','btnJoin','roomMessage','lobbyHeading','lobbyStatus','roomCode','btnCopy','btnShare','participants','arenaSelect','arenaDescription','botCount','btnStart','btnAgain','btnLeave','scoreboard','combatLog','touchTarget','touchBurst','touchGuard'].map(x=>[x,$(x)]));
 const ctx=els.stage.getContext('2d',{alpha:false});
 let ws,ownId=null,room=null,tops=[],arenas=[],parts={ratchets:[],bits:[]},selected='phoenix',build={ratchet:'wide7',bit:'taper'},filter='全部',latest=null,vis={},particles=[],shockwaves=[],trails={},logEntries=[],lastEvent='',status='offline',audioOn=false,audioCtx=null,beatTimer=null,beatStep=0,soundCooldown=0;
 let playTime=0,flash=0,shake=0,bannerTimer=null,toastTimer=null,gameOverShown=false;
@@ -12,7 +12,7 @@ const saveSession=(token,code)=>{try{sessionStorage.setItem(storageKey,JSON.stri
 const readSession=()=>{try{return JSON.parse(sessionStorage.getItem(storageKey)||'null');}catch{return null;}};
 const clearSession=()=>{try{sessionStorage.removeItem(storageKey);}catch{}};
 try{const previousName=localStorage.getItem('spinbreak-player-name');if(previousName)els.playerName.value=previousName;const b=JSON.parse(localStorage.getItem('spinbreak-build-v4')||'null');if(b?.top)selected=b.top;if(b?.ratchet)build.ratchet=b.ratchet;if(b?.bit)build.bit=b.bit;}catch{}
-const input={keys:new Set(),joyX:0,joyY:0,guard:false,burst:false};
+const input={charge:false,burst:false};let targetId=null;
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const hypot=(x,y)=>Math.hypot(x,y);
 const escapeHTML = s => String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -44,12 +44,12 @@ function netUI(){els.netState.textContent=({online:'伺服器已連線',offline:
 function onMessage(m){switch(m.t){
  case 'hello':ownId=m.id;tops=m.tops;arenas=m.arenas;parts=m.parts||parts;if(!tops.some(t=>t.id===selected))selected='phoenix';renderBuildOptions();renderRoster();renderProfile();renderArenaOptions();{const old=readSession();if(old?.token&&(!queryRoom||old.code===queryRoom)){waitForResume=true;send({t:'resume',token:old.token});}else{waitForResume=false;inviteOverlay();}}return;
  case 'resume_failed':waitForResume=false;clearSession();room=null;latest=null;renderLobby();if(queryRoom)inviteOverlay();else showOverlay('準備進入戰場','點擊建立房間，即可與 AI 練習或邀請朋友','立即開始對戰',()=>els.btnCreate.click());return;
- case 'joined':ownId=m.id;room=m.room;waitForResume=false;{const mine=room.players.find(p=>p.id===ownId);if(mine){selected=mine.top;build=mine.build||build;renderBuildOptions();renderRoster();renderProfile();}}if(m.token)saveSession(m.token,room.code);if(!m.resumed){latest=null;vis={};trails={};particles=[];logEntries=[];gameOverShown=false;}renderLobby();
+ case 'joined':ownId=m.id;room=m.room;waitForResume=false;{const mine=room.players.find(p=>p.id===ownId);if(mine){selected=mine.top;build=mine.build||build;renderBuildOptions();renderRoster();renderProfile();}}if(m.token)saveSession(m.token,room.code);if(!m.resumed){latest=null;vis={};trails={};particles=[];logEntries=[];gameOverShown=false;targetId=null;}renderLobby();
  if(room.status==='lobby'){showOverlay(m.resumed?'歡迎回到競技場！':'集結！準備開戰','分享邀請連結給朋友，所有玩家選好陀螺後由房主開戰',room.host===ownId?'開始戰鬥':'等待房主開始',()=>room?.host===ownId?send({t:'start'}):notify('等待房主開始戰鬥'));}
  else if(room.status==='playing')hideOverlay();
  showMsg((m.resumed?'已恢復連線：':'已進入房間：')+room.code,'success');return;
  case 'room':room=m.room;renderLobby();if(room.status==='playing')hideOverlay();return;
- case 'tick':latest=m;if(room&&room.status==='playing'){els.gameTimer.textContent=formatTime(75-m.time);els.roundState.textContent='BATTLE LIVE';renderScores();renderHud();}return;
+ case 'tick':latest=m;if(room&&room.status==='playing'){els.gameTimer.textContent=formatTime(75-m.time);els.roundState.textContent='BATTLE LIVE';renderScores();renderHud();updateChargeUI();}return;
  case 'event':handleEvent(m);return;
  case 'result':showResults(m.results);return;
  case 'error':showMsg(m.msg,'error');notify(m.msg);if(queryRoom&&!room)inviteOverlay();return;
@@ -106,18 +106,50 @@ els.overlayPlay.addEventListener('click',()=>els.btnCreate.click());
 function notify(s){els.eventToast.textContent=s;els.eventToast.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>els.eventToast.classList.remove('show'),2300);}
 function banner(s){els.impactBanner.textContent=s;els.impactBanner.classList.remove('show');void els.impactBanner.offsetHeight;els.impactBanner.classList.add('show');clearTimeout(bannerTimer);bannerTimer=setTimeout(()=>els.impactBanner.classList.remove('show'),900);}
 function log(s){logEntries.unshift(s);logEntries=logEntries.slice(0,18);els.combatLog.innerHTML=logEntries.map(x=>`<div class="log-line">${escapeHTML(x)}</div>`).join('');}
-function handleEvent(m){log(m.msg);if(m.kind==='start'){gameOverShown=false;banner('LET IT RIP!');hideOverlay();playEffect('start');return;}const f=latest?.fighters?.find(x=>x.id===m.id);if(f||Number.isFinite(m.x)){const t=getTop(f?.top);const fx=m.x??f?.x,fy=m.y??f?.y;spawnBurst(fx,fy,t?.color||'#ff8749',m.kind==='skill'?45:m.kind==='hit'?34:20,m.kind==='hit'?Math.max(100,m.amount*.9):120);shockwaves.push({x:fx,y:fy,r:10,life:m.kind==='hit'?.7:m.kind==='skill'?1.2:.5,max:m.kind==='hit'?.7:m.kind==='skill'?1.2:.5,c:t?.color||'#ffaa55'});}if(m.kind==='skill'){notify(m.msg);banner('BURST!!');shake=6;flash=.2;playEffect('skill');}else if(m.kind==='ko'){notify(m.msg);banner(m.msg.includes('場外')?'RING OUT!':'SPIN FINISH!');shake=15;flash=.5;playEffect('ko');}else if(m.kind==='hit'){shake=Math.max(shake,clamp(m.amount/14,6,22));flash=Math.max(flash,Math.min(.25,m.amount/1800));if(m.amount>180)banner('CLASH!');playEffect('hit');}else if(m.kind==='wall'){shake=Math.max(shake,8);playEffect('hit');}else if(m.kind==='rail'){notify('外圈通道 · 加速準備！');shake=7;playEffect('skill');}else if(m.kind==='return'){banner('RAIL RETURN!');shake=9;playEffect('skill');}}
+function handleEvent(m){log(m.msg);if(m.kind==='start'){gameOverShown=false;banner('LET IT RIP!');hideOverlay();playEffect('start');return;}const f=latest?.fighters?.find(x=>x.id===m.id);if(f||Number.isFinite(m.x)){const t=getTop(f?.top);const fx=m.x??f?.x,fy=m.y??f?.y;spawnBurst(fx,fy,t?.color||'#ff8749',m.kind==='skill'?45:m.kind==='charge'?42:m.kind==='hit'?34:20,m.kind==='hit'?Math.max(100,m.amount*.9):120);shockwaves.push({x:fx,y:fy,r:10,life:m.kind==='hit'?.7:m.kind==='skill'?1.2:.5,max:m.kind==='hit'?.7:m.kind==='skill'?1.2:.5,c:t?.color||'#ffaa55'});}if(m.kind==='skill'){notify(m.msg);banner('BURST!!');shake=6;flash=.2;playEffect('skill');}else if(m.kind==='charge'){banner('EXTREME CHARGE!');shake=10;flash=.2;playEffect('skill');}else if(m.kind==='ko'){notify(m.msg);banner(m.msg.includes('場外')?'RING OUT!':'SPIN FINISH!');shake=15;flash=.5;playEffect('ko');}else if(m.kind==='hit'){shake=Math.max(shake,clamp(m.amount/14,6,22));flash=Math.max(flash,Math.min(.25,m.amount/1800));if(m.amount>160)banner(m.critical?'CRITICAL IMPACT!':'CLASH!');playEffect('hit');}else if(m.kind==='wall'){shake=Math.max(shake,8);playEffect('hit');}else if(m.kind==='rail'){notify('外圈通道 · 加速準備！');shake=7;playEffect('skill');}else if(m.kind==='return'){banner('RAIL RETURN!');shake=9;playEffect('skill');}}
 function showResults(results){if(gameOverShown)return;gameOverShown=true;const win=results?.find(x=>x.rank===1);const iWon=win?.id===ownId;banner(iWon?'VICTORY!':'BATTLE OVER');playEffect(iWon?'win':'ko');const scoreboard=results?.map(p=>`<div style="display:flex;justify-content:space-between;gap:30px;padding:6px 0;border-bottom:1px solid #ffffff25;font-size:13px"><span>${p.rank}. ${escapeHTML(p.name)}</span><span>${p.spin} 轉速 · ${escapeHTML(p.reason||'')}</span></div>`).join('')||'';showOverlay(iWon?'你就是這場的王者！':`勝者：${escapeHTML(win?.name||'挑戰者')}`,`<div style="min-width:210px;margin:8px auto 0">${scoreboard}</div><div style="margin-top:12px">房主可以在右側大廳按「再戰一場」。</div>`,'再戰準備',()=>{if(room?.host===ownId)els.btnAgain.click();else notify('等待房主重開房間');});}
 function renderScores(){if(!latest?.fighters)return;els.scoreboard.innerHTML=[...latest.fighters].sort((a,b)=>Number(b.alive)-Number(a.alive)||b.spin-a.spin).map(p=>{const t=getTop(p.top);return `<div class="score-item ${p.alive?'':'dead'}" style="--sc:${t?.color||'#fff'}"><span class="score-name">${escapeHTML(p.name)}${p.id===ownId?' (你)':''}</span><span class="score-value">${p.alive?p.spin+'% SPIN':'OUT'}</span></div>`;}).join('');}
 function renderHud(){if(!latest?.fighters)return;els.fightHud.innerHTML=latest.fighters.map(p=>{const t=getTop(p.top);return `<div class="hud-card ${p.id===ownId?'me':''} ${p.alive?'':'dead'}" style="--pcolor:${t?.color||'#fff'}"><div class="hud-name">${p.id===ownId?'★ ':''}${escapeHTML(p.name)}</div><div class="hud-meters"><div class="hud-meter spin"><i style="width:${p.spin}%"></i></div></div><div class="hud-nums"><span>轉速 ${p.spin}%</span><span>${p.alive?(p.wobble>45?'不穩定':'旋轉中'):(p.reason||'淘汰')}</span></div></div>`;}).join('');}
-// Controls: 20 Hz input, server-side authoritative hit verification.
-function getInput(){let x=0,y=0;for(const k of input.keys){if(k==='w'||k==='arrowup')y--;if(k==='s'||k==='arrowdown')y++;if(k==='a'||k==='arrowleft')x--;if(k==='d'||k==='arrowright')x++;}x+=input.joyX;y+=input.joyY;let n=Math.hypot(x,y);if(n>1){x/=n;y/=n;}return {t:'input',x,y,guard:input.guard||input.keys.has(' '),burst:input.burst};}
-setInterval(()=>{if(room?.status==='playing'){send(getInput());input.burst=false;}},50);
-window.addEventListener('keydown',e=>{if(['INPUT','SELECT','TEXTAREA'].includes(document.activeElement?.tagName))return;const k=e.key.toLowerCase();if(['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright',' ','j','k'].includes(k)){e.preventDefault();input.keys.add(k);if((k==='j'||k==='k')&&!e.repeat)input.burst=true;}});
-window.addEventListener('keyup',e=>input.keys.delete(e.key.toLowerCase()));window.addEventListener('blur',()=>{input.keys.clear();input.guard=false;input.joyX=0;input.joyY=0;});
-let joyPointer=null;function joyMove(e){const rect=els.joyZone.getBoundingClientRect();let x=(e.clientX-(rect.left+rect.width/2))/(rect.width*.35),y=(e.clientY-(rect.top+rect.height/2))/(rect.height*.35);let n=hypot(x,y);if(n>1){x/=n;y/=n;}input.joyX=x;input.joyY=y;els.joyKnob.style.transform=`translate(${x*31}px,${y*31}px)`;}
-els.joyZone.addEventListener('pointerdown',e=>{if(joyPointer!==null)return;joyPointer=e.pointerId;els.joyZone.setPointerCapture(e.pointerId);joyMove(e);});els.joyZone.addEventListener('pointermove',e=>{if(e.pointerId===joyPointer)joyMove(e);});function joyEnd(e){if(e.pointerId!==joyPointer)return;joyPointer=null;input.joyX=0;input.joyY=0;els.joyKnob.style.transform='';}els.joyZone.addEventListener('pointerup',joyEnd);els.joyZone.addEventListener('pointercancel',joyEnd);
-els.touchBurst.addEventListener('pointerdown',e=>{e.preventDefault();input.burst=true;});els.touchGuard.addEventListener('pointerdown',e=>{e.preventDefault();input.guard=true;els.touchGuard.classList.add('pressed');els.touchGuard.setPointerCapture(e.pointerId);});for(const k of ['pointerup','pointercancel','lostpointercapture'])els.touchGuard.addEventListener(k,()=>{input.guard=false;els.touchGuard.classList.remove('pressed');});
+// V5: no movement controls. Each command is a one-shot, server-authoritative skill.
+function selectNextTarget(){
+ const alive=latest?.fighters?.filter(p=>p.alive&&p.id!==ownId&&!p.rail)||[];
+ if(!alive.length){targetId=null;return;}
+ const i=alive.findIndex(p=>p.id===targetId);
+ targetId=alive[(i+1)%alive.length].id;
+ notify('鎖定 '+alive.find(p=>p.id===targetId).name);
+}
+function sendAction(type){
+ if(room?.status!=='playing')return;
+ const me=latest?.fighters?.find(p=>p.id===ownId);
+ if(!me?.alive)return;
+ if(type==='charge'&&me.chargeCd>.08){notify(`衝鋒冷卻 ${me.chargeCd.toFixed(1)} 秒`);return;}
+ if(type==='burst'&&me.cool>.08){notify(`必殺冷卻 ${me.cool.toFixed(1)} 秒`);return;}
+ send({t:'input',charge:type==='charge',burst:type==='burst',targetId});
+}
+function updateChargeUI(){
+ const me=latest?.fighters?.find(p=>p.id===ownId);
+ if(!me)return;
+ els.touchGuard.innerHTML=me.chargeCd>0?`衝鋒 <small>${me.chargeCd.toFixed(1)}s</small>`:'衝鋒 <small>CHARGE</small>';
+ els.touchBurst.innerHTML=me.cool>0?`必殺 <small>${me.cool.toFixed(1)}s</small>`:'必殺 <small>SKILL</small>';
+ els.touchTarget.textContent='◎ '+(latest?.fighters?.find(p=>p.id===targetId)?.name||'自動鎖定最近目標');
+}
+window.addEventListener('keydown',e=>{
+ if(['INPUT','SELECT','TEXTAREA'].includes(document.activeElement?.tagName))return;
+ const k=e.key.toLowerCase();
+ if([' ','j','k','tab'].includes(k)){e.preventDefault();if(e.repeat)return;
+ if(k===' ')sendAction('charge');else if(k==='tab')selectNextTarget();else sendAction('burst');}
+});
+els.touchGuard.addEventListener('click',()=>sendAction('charge'));
+els.touchBurst.addEventListener('click',()=>sendAction('burst'));
+els.touchTarget.addEventListener('click',selectNextTarget);
+els.stage.addEventListener('pointerdown',e=>{
+ if(room?.status!=='playing'||!latest?.fighters)return;
+ const rect=els.stage.getBoundingClientRect();
+ const x=(e.clientX-rect.left)*W/rect.width-CX;
+ const y=(e.clientY-rect.top)*H/rect.height-CY;
+ const hit=latest.fighters.filter(p=>p.alive&&p.id!==ownId).find(p=>dist(p.x-x,p.y-y)<36);
+ if(hit){targetId=hit.id;notify('鎖定 '+hit.name);updateChargeUI();}
+});
 // Original synth percussion loop; all sounds are generated on device (no downloaded audio).
 function initAudio(){const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio)return;audioCtx=audioCtx||new Audio();if(audioCtx.state==='suspended')audioCtx.resume();}
 function tone(freq,duration,type='sine',gain=.12,slide=1){if(!audioOn||!audioCtx)return;const t=audioCtx.currentTime;let osc=audioCtx.createOscillator(),g=audioCtx.createGain();osc.type=type;osc.frequency.setValueAtTime(freq,t);osc.frequency.exponentialRampToValueAtTime(Math.max(30,freq*slide),t+duration);g.gain.setValueAtTime(gain,t);g.gain.exponentialRampToValueAtTime(.001,t+duration);osc.connect(g).connect(audioCtx.destination);osc.start(t);osc.stop(t+duration+.01);}
@@ -194,6 +226,8 @@ function drawTop(p,t,tm,dt){if(!p.alive){
  if(p.boost&&Math.random()<.28)spawnBurst(p.x,p.y,col,2,40);
  if(p.phase){ctx.save();ctx.globalAlpha=.33;drawTopBody(x-17,y+10,r,col,acc,ang-.4);drawTopBody(x+18,y-8,r,col,acc,ang+.4);ctx.restore();}
  ctx.save();ctx.translate(x,y);ctx.fillStyle='#0009';ctx.beginPath();ctx.ellipse(3,15,27,10,0,0,TAU);ctx.fill();ctx.restore();
+ if(p.id===targetId){ctx.save();ctx.setLineDash([5,5]);ctx.strokeStyle='#ffec73';ctx.lineWidth=3;pathCircle(x,y,34);ctx.stroke();ctx.restore();}
+ if(p.charging){ctx.save();ctx.strokeStyle='#ffe0a0';ctx.lineWidth=4;ctx.shadowColor='#ffc44b';ctx.shadowBlur=26;pathCircle(x,y,32);ctx.stroke();ctx.restore();}
  if(p.shield){ctx.save();ctx.strokeStyle='#b6eafd';ctx.lineWidth=2;ctx.shadowColor='#71d6ff';ctx.shadowBlur=15;ctx.setLineDash([8,5]);ctx.lineDashOffset=-tm*28;pathCircle(x,y,30);ctx.stroke();ctx.restore();}
  if(p.blade){rotRing(x,y,34,4,-tm*3,color(acc,.75),4);}
  if(p.impact)glowCircle(x,y,27,'rgba(255,243,220,.62)',20);if(p.rail){glowCircle(x,y,32,'rgba(72,233,255,.28)',25);rotRing(x,y,34,5,tm*8,'#7df8ff',3);}
