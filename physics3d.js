@@ -52,14 +52,14 @@ function makeEngine(tops,parts,callbacks){
   if(r.physics?.world)r.physics.world.free();makeArena(r);
   const membersCount=members.length;
   return members.map((p,i)=>{
-   const a=TAU*i/membersCount-Math.PI/2;
-   const x=3.25*Math.cos(a),z=3.25*Math.sin(a),t=topBy[p.top];
+   const a=TAU*i/membersCount-Math.PI/2+.48;
+   const x=2.20*Math.cos(a),z=2.20*Math.sin(a),t=topBy[p.top];
    const st=stats(p),rad=.48,spinRate=82+st.stamina*3;
    // Top-shaped compound collision body: bottom tip + mid ratchet + large attack rim.
    const lean=.025+(i%3)*.01;
    const body=r.physics.world.createRigidBody(R.RigidBodyDesc.dynamic()
      .setTranslation(x,.39,z).setRotation({x:Math.cos(a)*Math.sin(lean/2),y:0,z:Math.sin(a)*Math.sin(lean/2),w:Math.cos(lean/2)})
-     .setLinvel(-Math.sin(a)*2.1,0,Math.cos(a)*2.1)
+     .setLinvel(-Math.sin(a)*3.1,0,Math.cos(a)*3.1)
      .setAngvel(V(.6,spinRate,.6))
      .setLinearDamping(.18).setAngularDamping(.055).setCcdEnabled(true).setCanSleep(false));
    const events=R.ActiveEvents.COLLISION_EVENTS|R.ActiveEvents.CONTACT_FORCE_EVENTS;
