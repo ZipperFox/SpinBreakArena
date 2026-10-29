@@ -67,41 +67,99 @@ function createStage(name){battleground.clear();stageName=name;
  const middle=mesh(new THREE.CylinderGeometry(1.16,1.16,.015,40),new THREE.MeshBasicMaterial({color:hot,transparent:true,opacity:.06}),battleground);middle.position.y=.029;
 }
 const models=new Map(),effects=[];
-function buildTop(top,parts){
- const [main,accent]=[parts?.paint||top.color||'#ff7355',top.accent||'#ffe8ab'];
+// V9.3: layered, toy-proportioned spinning top visual models. Rapier remains unchanged.
+function buildTop(top,parts={}){
+ const main=parts.paint||top.color||'#ff7355',accent=top.accent||'#ffe8ab';
  const root=new THREE.Group();root.userData.fighterId=null;
  const bladePart=new THREE.Group(),ratchetPart=new THREE.Group(),bitPart=new THREE.Group();
  root.add(bladePart,ratchetPart,bitPart);root.userData.assemblies={bladePart,ratchetPart,bitPart};
- const metal=mat('#182f48',.88,.25),blade=mat(main,.65,.28,main,.23),edge=mat(accent,.84,.22,accent,.48);
- const form=top.blade||{lobes:5,reach:.39,tip:.13,shape:'wave'};
- const base=mesh(new THREE.CylinderGeometry(.31,.31,.25,40),blade,bladePart);base.position.y=.05;base.castShadow=!mobile;
- const rim=mesh(new THREE.TorusGeometry(.31,.048,9,48),edge,bladePart);rim.rotation.x=Math.PI/2;rim.position.y=.165;
- for(let i=0;i<form.lobes;i++){
-  const a=Math.PI*2*i/form.lobes+(form.shape==='swept'?.10:0),rr=form.reach-(i%2&&form.shape==='hammer'?.04:0);
-  const lobe=mesh(new THREE.SphereGeometry(form.tip,12,9),i%2?blade:edge,bladePart);
-  lobe.position.set(Math.cos(a)*rr,.05+(form.shape==='axe'?.07:0),Math.sin(a)*rr);
-  lobe.castShadow=!mobile;
-  const spoke=mesh(new THREE.BoxGeometry(.29,.08,.11),blade,bladePart);
-  spoke.position.set(Math.cos(a)*rr*.65,.075,Math.sin(a)*rr*.65);spoke.rotation.y=-a;
+ const form=top.blade||{lobes:5,reach:.40,tip:.12,shape:'wave'};
+ const count=Math.max(2,form.lobes||5),shape=form.shape||'wave';
+ const armor=mat('#243141',.83,.28),dark=mat('#101723',.66,.40);
+ const steel=mat('#c1cad8',.84,.25),bright=mat('#eff7ff',.76,.22);
+ const color=mat(main,.61,.28,main,.14),line=mat(accent,.70,.24,accent,.26);
+ const rubber=mat('#1d2430',.05,.83);
+ const make=(g,m,parent,x=0,y=0,z=0)=>{const o=mesh(g,m,parent);o.position.set(x,y,z);o.castShadow=!mobile;return o;};
+ const cyl=(a,b,h,m,parent,y,n=40)=>make(new THREE.CylinderGeometry(a,b,h,n),m,parent,0,y);
+ const tor=(r,t,y,m,parent=bladePart)=>{const o=make(new THREE.TorusGeometry(r,t,8,44),m,parent,0,y);o.rotation.x=Math.PI/2;return o;};
+ // Thick attack ring with a genuinely different outline for each blade form.
+ cyl(.347,.345,.16,armor,bladePart,.006);
+ cyl(.295,.315,.055,color,bladePart,.111);
+ tor(.331,.028,.121,steel);
+ tor(.257,.017,.153,line);
+ const amp=shape==='shield'?.053:shape==='hammer'?.09:shape==='axe'?.108:shape==='swept'?.087:shape==='talon'?.10:.068;
+ const outline=new THREE.Shape(),steps=Math.max(80,count*16);
+ for(let i=0;i<steps;i++){
+  const a=2*Math.PI*i/steps,phase=(i*count/steps)%1;
+  let pulse;
+  if(shape==='shield')pulse=.45+.45*Math.cos(2*Math.PI*phase)**2;
+  else if(shape==='hammer')pulse=phase<.44?.94:Math.max(.1,.94-(phase-.44)*1.55);
+  else if(shape==='axe')pulse=phase<.22?.42+phase*2.6:Math.max(.07,1-(phase-.22)*1.24);
+  else if(shape==='swept')pulse=(1-phase)**.58;
+  else if(shape==='talon')pulse=phase<.78?.18+phase*1.04:Math.max(.10,1-(phase-.78)*4.1);
+  else pulse=.48+.47*Math.sin(phase*Math.PI);
+  const r=.365+amp*pulse,x=Math.cos(a)*r,z=Math.sin(a)*r;
+  if(i===0)outline.moveTo(x,z);else outline.lineTo(x,z);
  }
- const gear=parts?.ratchet==='dense9'?9:parts?.ratchet==='swift2'?2:parts?.ratchet==='wide7'?7:parts?.ratchet==='heavy5'?5:parts?.ratchet==='tall4'?4:3;
- const lower=mesh(new THREE.CylinderGeometry(.235,.22,.13,28),metal,ratchetPart);lower.position.y=-.115;
- for(let j=0;j<gear;j++){
-  const a=Math.PI*2*j/gear;
-  const tooth=mesh(new THREE.SphereGeometry(.055,9,7),j%2?edge:metal,ratchetPart);tooth.position.set(Math.cos(a)*.235,-.115,Math.sin(a)*.235);
+ outline.closePath();
+ const rotor=make(new THREE.ExtrudeGeometry(outline,{depth:.115,steps:1,bevelEnabled:true,bevelSize:.012,bevelThickness:.014,bevelSegments:1}),[color,steel],bladePart,0,-.012);
+ rotor.rotation.x=-Math.PI/2;
+ cyl(.243,.254,.032,dark,bladePart,.160);
+ tor(.245,.015,.182,steel);
+ // Radial metal plates, fastening bolts and raised central lock.
+ for(let i=0;i<count;i++){
+  const a=(i+.5)*2*Math.PI/count,sector=Math.min(.38,Math.PI/count*.65);
+  const plate=new THREE.Shape();const inner=.283,outer=shape==='shield'?.396:.423;
+  for(let j=0;j<=5;j++){
+   const ang=a-sector+2*sector*j/5,r=inner+(outer-inner)*j/5;
+   if(j===0)plate.moveTo(Math.cos(ang)*r,Math.sin(ang)*r);
+   else plate.lineTo(Math.cos(ang)*r,Math.sin(ang)*r);
+  }
+  for(let j=5;j>=0;j--){const ang=a-sector+2*sector*j/5,r=inner+.12*(outer-inner);plate.lineTo(Math.cos(ang)*r,Math.sin(ang)*r);}
+  plate.closePath();
+  const fin=make(new THREE.ExtrudeGeometry(plate,{depth:.028,bevelEnabled:true,bevelSize:.007,bevelThickness:.007,bevelSegments:1}),i%3===0?line:i%2?steel:color,bladePart,0,.146+(i%3===0?.009:0));
+  fin.rotation.x=-Math.PI/2;
+  make(new THREE.CylinderGeometry(.017,.017,.011,8),i%2?bright:dark,bladePart,Math.cos(a)*.294,.196,Math.sin(a)*.294);
  }
- const tipRadius=parts?.bit==='ball'?.15:parts?.bit==='needle'?.085:parts?.bit==='rubber'?.145:.115;
- const tip=mesh(new THREE.SphereGeometry(tipRadius,18,12),mat(parts?.bit==='rubber'?'#ff945f':'#e6faff',.52,.31),bitPart);
- tip.position.y=-.25;
- const inner=mesh(new THREE.CylinderGeometry(.17,.20,.04,24),metal,bladePart);inner.position.y=.18;
- const gem=mesh(new THREE.SphereGeometry(.095,15,12),mat('#fff9e9',.4,.12,accent,.95),bladePart);gem.position.y=.245;
+ cyl(.203,.215,.053,steel,bladePart,.188);
+ cyl(.171,.176,.037,dark,bladePart,.229);
+ tor(.178,.014,.250,line);
+ cyl(.129,.133,.029,color,bladePart,.263,24);
+ const jewel=make(new THREE.OctahedronGeometry(.088,0),bright,bladePart,0,.289);jewel.scale.y=.27;
+ for(let i=0;i<4;i++){const a=i*Math.PI/2+.45;make(new THREE.BoxGeometry(.036,.017,.074),line,bladePart,Math.cos(a)*.146,.265,Math.sin(a)*.146).rotation.y=-a;}
+ // Ratchet: physically layered middle gear with visible teeth count.
+ const ratchet=parts.ratchet||'wide7';
+ const gears={low3:3,heavy5:5,wide7:7,tall4:4,dense9:9,swift2:2};
+ const countGear=gears[ratchet]||7,heavy=ratchet==='heavy5'||ratchet==='dense9';
+ const width=heavy?.270:ratchet==='swift2'?.225:.246;
+ cyl(width,width*.92,.115,armor,ratchetPart,-.148,32);
+ cyl(.180,.171,.061,steel,ratchetPart,-.217,32);
+ for(let i=0;i<countGear;i++){
+  const a=2*Math.PI*i/countGear;
+  const tooth=make(new THREE.BoxGeometry(heavy?.089:.070,.098,heavy?.096:.066),i%2?color:steel,ratchetPart,Math.cos(a)*(width-.018),-.154,Math.sin(a)*(width-.018));
+  tooth.rotation.y=-a;
+ }
+ tor(.19,.014,-.084,line,ratchetPart);
+ // Bit: recognizable tip shape for each of the eight interchangeable axle types.
+ const bit=parts.bit||'taper',bitMat=bit==='rubber'?rubber:color;
+ cyl(.134,.120,.08,steel,bitPart,-.264,32);
+ cyl(.110,.101,.056,dark,bitPart,-.307,32);
+ const cone=(a,b,h,y,m)=>cyl(a,b,h,m,bitPart,y,28);
+ if(bit==='flat'){cone(.105,.124,.081,-.353,bitMat);cone(.123,.123,.018,-.392,rubber);}
+ else if(bit==='rush'){cone(.112,.091,.088,-.356,bitMat);for(let i=0;i<6;i++){const a=i*Math.PI/3;const t=make(new THREE.BoxGeometry(.03,.04,.04),steel,bitPart,Math.cos(a)*.112,-.361,Math.sin(a)*.112);t.rotation.y=-a;}cone(.092,.09,.018,-.400,steel);}
+ else if(bit==='ball'){cone(.107,.09,.049,-.344,bitMat);make(new THREE.SphereGeometry(.089,18,12),steel,bitPart,0,-.352);}
+ else if(bit==='needle'){cone(.104,.054,.071,-.345,bitMat);cone(.055,.009,.096,-.387,steel);}
+ else if(bit==='orbit'){cone(.105,.092,.066,-.344,bitMat);tor(.094,.022,-.369,steel,bitPart);make(new THREE.SphereGeometry(.073,16,12),line,bitPart,0,-.372);}
+ else if(bit==='gear'){cone(.117,.087,.088,-.352,bitMat);for(let i=0;i<8;i++){const a=i*Math.PI/4;const t=make(new THREE.BoxGeometry(.027,.052,.03),steel,bitPart,Math.cos(a)*.105,-.362,Math.sin(a)*.105);t.rotation.y=-a;}cone(.079,.055,.039,-.41,steel);}
+ else if(bit==='rubber'){cone(.115,.131,.093,-.358,rubber);cone(.129,.129,.028,-.402,bitMat);}
+ else{cone(.114,.047,.124,-.36,bitMat);make(new THREE.SphereGeometry(.031,12,8),steel,bitPart,0,-.416);}
  return root;
 }
-// Garage preview displays the *same* blade lobes, ratchet teeth and tip geometry used by Rapier.
+// Garage uses the same visual parts as combat; Rapier keeps simplified rigid-body colliders.
 const garageCanvas=document.getElementById('garage3d');
 let garageRenderer=null,garagePreview=null,garageKey='';const garageScene=new THREE.Scene();
 garageScene.background=new THREE.Color('#091321');
-const garageCamera=new THREE.PerspectiveCamera(35,1,.1,30);garageCamera.position.set(2.0,1.7,3.0);garageCamera.lookAt(0,0,0);
+const garageCamera=new THREE.PerspectiveCamera(35,1,.1,30);garageCamera.position.set(1.76,1.4,2.46);garageCamera.lookAt(0,0,0);
 garageScene.add(new THREE.HemisphereLight('#d8f3ff','#1b263a',2.6));
 const glight=new THREE.DirectionalLight('#ffcc9c',5);glight.position.set(-2,5,4);garageScene.add(glight);
 function updateGarage(state){
