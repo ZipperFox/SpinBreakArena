@@ -72,7 +72,7 @@ function makeEngine(tops,parts,callbacks){
      .setTranslation(0,-.25,0).setDensity(st.mass*.3).setFriction(.40*st.grip).setRestitution(.18),body);
    for(const c of [rim,ratchet,tip])r.physics.byCollider.set(c.handle,p.id);
    return {...p,x:x*U,y:z*U,h:body.translation().y*U,vx:0,vy:0,q:[0,0,0,1],body,
-      initialSpin:spinRate,spin:100,wobble:0,alive:true,koReason:'',cool:0,chargeCd:0,
+      initialSpin:spinRate,spin:100,spinEnergy:100,wobble:0,alive:true,koReason:'',cool:0,chargeCd:0,
       chargeUntil:0,boostUntil:0,fortressUntil:0,phaseUntil:0,bladeUntil:0,slowUntil:0,stunUntil:0,
       impact:0,skillCount:0,railTimer:0,railCooldown:0,railSign:1,railAngle:0,bot:!!p.bot,
       input:{targetId:null},aiTimer:0,orbitSign:i%2?-1:1,orbitPhase:i*2.2,
@@ -82,7 +82,8 @@ function makeEngine(tops,parts,callbacks){
  function sync(p){const pos=p.body.translation(),vel=p.body.linvel(),q=p.body.rotation(),w=p.body.angvel(),ax=quatAxis(q);
   p.x=pos.x*U;p.y=pos.z*U;p.h=pos.y*U;p.vx=vel.x*U;p.vy=vel.z*U;p.q=[q.x,q.y,q.z,q.w];
   const topSpin=Math.abs(w.x*ax.x+w.y*ax.y+w.z*ax.z);
-  p.spin=clamp(topSpin/p.initialSpin*100,0,105);
+  p.physicalSpin=clamp(topSpin/p.initialSpin*100,0,105);
+  p.spin=clamp(p.spinEnergy,0,100);
   p.wobble=clamp(Math.acos(clamp(ax.y,-1,1))*100/1.2,0,100);
  }
  function target(r,p,id){return r.fighters.find(f=>f.alive&&f.id!==p.id&&f.id===id)||r.fighters.filter(f=>f.alive&&f.id!==p.id).sort((a,b)=>length(a.x-p.x,a.y-p.y)-length(b.x-p.x,b.y-p.y))[0];}
@@ -99,7 +100,7 @@ function makeEngine(tops,parts,callbacks){
   p.body.applyImpulse(V(nx*p.body.mass()*strength,p.body.mass()*.22,nz*p.body.mass()*strength),true);
   p.body.applyTorqueImpulse(V(-nz*.35*p.body.mass(),0,nx*.35*p.body.mass()),true);
   p.chargeCd=4.5;p.chargeUntil=r.age+.75;p.chargeCount++;
-  p.body.setAngvel(V(p.body.angvel().x,p.body.angvel().y*.958,p.body.angvel().z),true);
+  p.spinEnergy=Math.max(0,p.spinEnergy-3.8);
   callbacks.event(r,'charge',`${p.name} · 極限衝鋒！`,p.id,Math.round(strength*40),{x:p.x,y:p.y,targetId:q.id});return true;
  }
  function skill(r,p){if(!p.alive||p.cool>0||p.spin<12)return false;const t=topBy[p.top],foes=r.fighters.filter(q=>q.alive&&q.id!==p.id);
@@ -117,14 +118,14 @@ function makeEngine(tops,parts,callbacks){
    case 'vortex':near(4.2,q=>{const a=p.body.translation(),b=q.body.translation(),[nx,nz]=norm(a.x-b.x,a.z-b.z);q.body.applyImpulse(V(nx*2*q.body.mass(),.1,nz*2*q.body.mass()),true);});break;
    case 'nova':near(3.8,q=>burst(r,q,p,7,1.9));break;
   }
-  p.body.setAngvel(V(p.body.angvel().x,p.body.angvel().y*.97,p.body.angvel().z),true);
+  p.spinEnergy=Math.max(0,p.spinEnergy-2.8);
   callbacks.event(r,'skill',`${p.name} · ${t.skill}！`,p.id,0);return true;
  }
  function spinStop(r,p){if(!p.alive)return;sync(p);const pos=p.body.translation(),v=p.body.linvel();
   if(pos.y<-.65||length(pos.x,pos.z)>8.25){callbacks.ko(r,p,'擊出場外');return;}
-  if(p.spin<6.5){p.deadTime=(p.deadTime||0)+TICK;}else p.deadTime=0;
+  if(p.spin<5.5){p.deadTime=(p.deadTime||0)+TICK;}else p.deadTime=0;
   const lean=quatAxis(p.body.rotation()).y;
-  if(p.spin<6.5&&p.deadTime>.55 || (lean<.32&&p.spin<30&&pos.y<.35)){callbacks.ko(r,p,'停止轉動');return;}
+  if(r.age>7&&(p.spin<5.5&&p.deadTime>.75 || (lean<.12&&p.spin<25&&pos.y<.35))){callbacks.ko(r,p,'停止轉動');return;}
   if(Math.abs(v.x)+Math.abs(v.z)<.1&&p.spin<7.5){p.deadTime+=TICK;}
  }
  function enterLane(r,p){if(p.railTimer>0||p.railCooldown>0||!p.alive)return;
@@ -139,10 +140,17 @@ function makeEngine(tops,parts,callbacks){
   for(const p of r.fighters){if(!p.alive)continue;
    const b=p.body,pos=b.translation(),w=b.angvel(),v=b.linvel(),axis=quatAxis(b.rotation()),st=stats(p);
    // Real angular speed, tip friction and angular momentum: extra spin stabilization is an arcade assist.
-   const spinSpeed=Math.max(0,w.x*axis.x+w.y*axis.y+w.z*axis.z);
+   const spinSpeed=w.x*axis.x+w.y*axis.y+w.z*axis.z;
+   // Motorized launch: retain the physical spin axis while gradually losing launch energy.
+   // The world still resolves 3D tilt, inertia, contact and impacts; this only represents
+   // a game-like, low-loss bearing instead of the exaggerated drag of a sphere tip.
+   p.spinEnergy=clamp(p.spinEnergy-TICK*(1.05+(p.bladeUntil>r.age?.15:0))*st.drain,0,100);
+   const desired=p.initialSpin*(p.spinEnergy/100);
+   const correction=clamp((desired-spinSpeed)*.28,-12,12);
+   b.applyTorqueImpulse(V(axis.x*correction*.045,axis.y*correction*.045,axis.z*correction*.045),true);
    const lateral=length(v.x,v.z);const radius=length(pos.x,pos.z);
-   if(spinSpeed>10){
-    const strength=(.055+st.stability*.14)*clamp(spinSpeed/95,.2,1.5);
+   if(p.spinEnergy>10){
+    const strength=(2.4+st.stability*2.0)*clamp(p.spinEnergy/100,.15,1);
     b.applyTorqueImpulse(V(-axis.z*strength*TICK,0,axis.x*strength*TICK),true);
     // Very light autonomous curvature from tip geometry, never player steering.
     if(p.stunUntil<=r.age&&p.chargeUntil<=r.age&&p.railTimer<=0){const [nx,nz]=norm(pos.x,pos.z);const torque=clamp((2.2-lateral)*.038,.002,.11)*st.drive;
@@ -158,7 +166,7 @@ function makeEngine(tops,parts,callbacks){
    if(r.arena==='tempest')b.applyImpulse(V(-pos.z*.002,0,pos.x*.002),true);
    if(r.arena==='volcano'&&r.age%8>6&&r.age%8<7&&Math.abs(pos.x)<2) b.applyImpulse(V(.045,.06,.025),true);
    const speed=length(v.x,v.z),max=15;if(speed>max){const s=max/speed;b.setLinvel(V(v.x*s,v.y,v.z*s),true);}
-   const decay=(.017+(p.bladeUntil>r.age?.005:0)+Math.max(0,1-st.stamina*.11)*.009)*st.drain;
+   const decay=(.005+(p.bladeUntil>r.age?.002:0)+Math.max(0,1-st.stamina*.11)*.003)*st.drain;
    b.applyTorqueImpulse(V(-w.x*.003*TICK,-w.y*decay*TICK,-w.z*.003*TICK),true);
   }
   phy.world.step(phy.queue);
@@ -185,6 +193,9 @@ function makeEngine(tops,parts,callbacks){
      burst(r,a,b,extra,clamp(rel*.13+(charged?1.0:0),.12,2.6));
      burst(r,b,a,extra,clamp(rel*.13+(charged?1.0:0),.12,2.6));
      a.lastHit=b.name;b.lastHit=a.name;a.lastHitAt=b.lastHitAt=r.age;
+     const loss=clamp(rel*.20+(charged?3.0:0)+impulse*.0002,.6,9.0);
+     a.spinEnergy=Math.max(0,a.spinEnergy-loss*stats(a).drain);
+     b.spinEnergy=Math.max(0,b.spinEnergy-loss*stats(b).drain);
      callbacks.event(r,'hit',`${a.name} ⚡ ${b.name} · 3D 重擊！`,a.id,Math.round(rel*40),{x:(a.x+b.x)/2,y:(a.y+b.y)/2,critical:charged,force:Math.round(impulse)});
    }else{
      who.impact=.35;
