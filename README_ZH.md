@@ -33,3 +33,10 @@
 - Render Free 可能在閒置後休眠；伺服器重啟會清空記憶體房間。
 
 參考：Rapier [Mass properties](https://rapier.rs/docs/user_guides/javascript/collider_mass_properties/)、[Forces and impulses](https://rapier.rs/docs/user_guides/javascript/rigid_body_forces_and_impulses/)、[Rigid bodies](https://rapier.rs/docs/user_guides/javascript/rigid_bodies/)、[Three.js](https://threejs.org/docs/)。
+
+## V9.1 護欄防自爆修正
+
+- 競技場一般護欄由低球型改為高 2m、重疊式直立圓柱，避免高速碰撞時沿球面被彈飛越過。
+- 只在真實護欄碰撞接觸事件後抑制失控向外／垂直速度，其他陀螺之間的撞飛與技能保留。
+- 側邊回場軌道增加高外壁與由速度決定的回場加速度；南北指定出界口仍可 KO。
+- `npm run test:guardrails`：五個場地的普通護欄、正式出界口及回場通道回歸測試。
