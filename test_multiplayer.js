@@ -16,6 +16,17 @@ async function run(){const checkHttp=await new Promise((resolve,reject)=>http.ge
  a.send({t:'start'});await Promise.all([a,b,c,d].map(x=>x.wait(m=>m.t==='room'&&m.room.status==='playing')));
  const snaps=await Promise.all([a,b,c,d].map(x=>x.wait(m=>m.t==='tick'&&Array.isArray(m.fighters)&&m.fighters.length===4)));
  assert(snaps.every(x=>x.fighters.length===4 && x.physics==='rapier3d'));assert(snaps.every(x=>x.fighters.find(f=>f.id===a.id).launch.power===100));assert(snaps.every(x=>x.fighters.every(f=>Number.isFinite(f.h)&&f.q?.length===4)));const ids=snaps.map(x=>x.fighters.map(f=>f.id).sort().join(','));assert(ids.every(x=>x===ids[0]),'Players disagree on fighters');
+ // Snapshot content must be identical across all four clients for the SAME server frame.
+ const checkSeq=Math.max(...snaps.map(x=>x.seq))+4;
+ const synced=await Promise.all([a,b,c,d].map(x=>x.wait(m=>m.t==='tick'&&m.seq===checkSeq,5000)));
+ assert(synced.every(x=>x.round===synced[0].round&&x.serverNow===synced[0].serverNow));
+ assert(synced.every(x=>JSON.stringify(x.fighters)===JSON.stringify(synced[0].fighters)),
+  'Different clients received different poses for the same authoritative frame');
+ assert(synced.every(x=>Number.isFinite(x.fighters[0].phase)));
+ assert(synced.every(x=>x.time>0&&x.time<5));
+ a.send({t:'ping',sentAt:1234});const pong=await a.wait(m=>m.t==='pong'&&m.sentAt===1234);
+ assert(Number.isFinite(pong.serverNow));
+ console.log('✓ four clients receive identical state at frame seq',checkSeq);
  a.send({t:'input',charge:true,targetId:b.id});b.send({t:'input',burst:true});c.send({t:'input',charge:true,targetId:d.id});d.send({t:'input',burst:true});await new Promise(r=>setTimeout(r,800));
  const after=await a.wait(m=>m.t==='tick'&&m.time>0.6);assert(after.fighters.every(f=>Number.isFinite(f.x)));assert(a.messages.some(m=>m.t==='event'&&m.kind==='skill'),'Skill event missing');assert(a.messages.some(m=>m.t==='event'&&m.kind==='charge'),'Charge event missing');
  console.log('✓ 4 real players connected and joined same room');console.log('✓ arena and lobby settings synchronized');console.log('✓ authoritative snapshots match across browsers');console.log('✓ one-shot charges and special skills triggered');

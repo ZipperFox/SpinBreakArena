@@ -125,7 +125,7 @@ function makeEngine(tops,parts,callbacks){
    contacts.push(tip);
    for(const c of contacts)r.physics.byCollider.set(c.handle,p.id);
    return {...p,x:x*U,y:z*U,h:body.translation().y*U,vx:0,vy:0,q:[0,0,0,1],body,
-      initialSpin:spinRate,launchStrength:launchSpeed,spin:100,spinEnergy:100,wobble:0,alive:true,koReason:'',cool:0,chargeCd:0,
+      initialSpin:spinRate,visualPhase:0,launchStrength:launchSpeed,spin:100,spinEnergy:100,wobble:0,alive:true,koReason:'',cool:0,chargeCd:0,
       chargeUntil:0,counterUntil:0,counterCd:0,counterCount:0,precisionCount:0,boostUntil:0,fortressUntil:0,phaseUntil:0,bladeUntil:0,slowUntil:0,stunUntil:0,
       impact:0,skillCount:0,railTimer:0,railCooldown:0,railSign:1,railAngle:0,bot:!!p.bot,
       input:{targetId:null},aiTimer:0,orbitSign:i%2?-1:1,orbitPhase:i*2.2,
@@ -206,7 +206,7 @@ function makeEngine(tops,parts,callbacks){
   }
  }
  function updateAnomaly(r){
-  if(r.chaos===false||r.status!=='playing')return;
+  if(r.chaos!==true||r.status!=='playing')return;
   const e=r.anomaly;
   if(e.phase==='idle'&&r.age>=r.nextAnomalyAt){
     let kinds=ANOMALY_IDS.filter(k=>k!==r.lastAnomaly),kind=kinds[Math.floor(Math.random()*kinds.length)];
@@ -224,7 +224,7 @@ function makeEngine(tops,parts,callbacks){
   }
  }
  function anomalyImpulse(r,p){
-  if(r.chaos===false||r.anomaly?.phase!=='active')return;
+  if(r.chaos!==true||r.anomaly?.phase!=='active')return;
   const e=r.anomaly,b=p.body,pos=b.translation(),vx=b.linvel().x,vz=b.linvel().z;
   const dx=e.x-pos.x,dz=e.z-pos.z,d=length(dx,dz),[nx,nz]=norm(dx,dz),m=b.mass();
   // Anomaly forces are deliberately bounded and mostly central. They must not
@@ -300,6 +300,11 @@ function makeEngine(tops,parts,callbacks){
    b.applyTorqueImpulse(V(-w.x*.003*TICK,-w.y*decay*TICK,-w.z*.003*TICK),true);
   }
   phy.world.step(phy.queue);
+  for(const p of r.fighters){
+   if(!p.alive)continue;
+   const q=p.body.rotation(),w=p.body.angvel(),axis=quatAxis(q);
+   p.visualPhase+=(w.x*axis.x+w.y*axis.y+w.z*axis.z)*TICK;
+  }
   // Contact force events and real velocity impulses measured by Rapier.
   phy.queue.drainContactForceEvents(c=>{
    const aid=phy.byCollider.get(c.collider1()),bid=phy.byCollider.get(c.collider2());
@@ -430,13 +435,13 @@ function makeEngine(tops,parts,callbacks){
   if(r.age>=90){const alive=r.fighters.filter(p=>p.alive).sort((a,b)=>b.spin-a.spin||a.wobble-b.wobble);for(const p of alive.slice(1)){p.alive=false;p.koReason='時間到：轉速判定';}callbacks.finish(r);return;}
   if(r.fighters.filter(p=>p.alive).length<=1)callbacks.finish(r);
  }
- function snapshot(r){return {t:'tick',physics:'rapier3d',time:+r.age.toFixed(1),radius:Math.round(RING*U),arena:r.arena,
+ function snapshot(r){return {t:'tick',physics:'rapier3d',time:+r.age.toFixed(4),radius:Math.round(RING*U),arena:r.arena,
    geometry:{pillars:(PLACES[r.arena]||PLACES.colosseum).map(([x,z,rad])=>({x:x*U,y:z*U,r:rad*U})),lanes:true,exitAngles:[Math.PI/2,-Math.PI/2]},
-   chaos:r.chaos!==false,anomaly:anomalyInfo(r),hazards:(r.physics?.debris||[]).map(d=>{
+   chaos:r.chaos===true,anomaly:anomalyInfo(r),hazards:(r.physics?.debris||[]).map(d=>{
      const p=d.body.translation();return {id:d.id,x:+p.x.toFixed(2),y:+p.y.toFixed(2),z:+p.z.toFixed(2),r:d.r};
    }),
    fighters:r.fighters.map(p=>{if(p.alive)sync(p);return {id:p.id,name:p.name,top:p.top,build:p.build,bot:p.bot,
-    x:+p.x.toFixed(1),y:+p.y.toFixed(1),h:+(p.h||0).toFixed(1),q:p.q,vx:Math.round(p.vx),vy:Math.round(p.vy),
+    x:+p.x.toFixed(2),y:+p.y.toFixed(2),h:+(p.h||0).toFixed(2),q:p.q,phase:+(p.visualPhase||0).toFixed(4),vx:Math.round(p.vx),vy:Math.round(p.vy),
     spin:Math.round(p.spin),wobble:Math.round(p.wobble),alive:p.alive,reason:p.koReason||'',rail:p.railTimer>0,
     cool:+p.cool.toFixed(1),chargeCd:+p.chargeCd.toFixed(1),counterCd:+p.counterCd.toFixed(1),countering:p.counterUntil>r.age,charging:p.chargeUntil>r.age,shield:p.fortressUntil>r.age,
     phase:p.phaseUntil>r.age,boost:p.boostUntil>r.age,blade:p.bladeUntil>r.age,impact:p.impact>0,skillCount:p.skillCount,

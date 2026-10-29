@@ -295,15 +295,24 @@ function loop(t){requestAnimationFrame(loop);const dt=Math.min(.05,Math.max(.001
  for(const p of fighters){active.add(p.id);let obj=models.get(p.id);const top=state.tops?.find(t=>t.id===p.top);
    if(!obj){if(!top)continue;const group=buildTop(top,p.build);group.userData.fighterId=p.id;scene.add(group);obj={group,targetP:new THREE.Vector3(),targetQ:new THREE.Quaternion(),lastX:0,lastZ:0};models.set(p.id,obj);}
    obj.group.visible=p.alive||s?.time<5;
-   obj.targetP.set((p.x||0)/40,(p.h||0)/40,(p.y||0)/40);if(Array.isArray(p.q))obj.targetQ.set(...p.q);
+   obj.targetP.set((p.x||0)/40,(p.h||0)/40,(p.y||0)/40);
+   if(Array.isArray(p.q)){
+      const q=new THREE.Quaternion(...p.q).normalize();
+      const axis=Array.isArray(p.axis)?new THREE.Vector3(...p.axis).normalize():new THREE.Vector3(0,1,0).applyQuaternion(q).normalize();
+      if(Number.isFinite(p.phase)){
+        const tilt=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),axis);
+        const spin=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),p.phase);
+        obj.targetQ.copy(tilt).multiply(spin);
+      }else obj.targetQ.copy(q);
+   }
    if(!obj.group.userData.init){obj.group.position.copy(obj.targetP);obj.group.quaternion.copy(obj.targetQ);obj.group.userData.init=true;}
-   else{obj.group.position.lerp(obj.targetP,Math.min(1,dt*21));obj.group.quaternion.slerp(obj.targetQ,Math.min(1,dt*21));}
+   else{obj.group.position.copy(obj.targetP);obj.group.quaternion.copy(obj.targetQ);}
    const tail=obj.group.userData.tail;if(!tail){const line=mesh(new THREE.TorusGeometry(.53,.020,6,30),mat(top?.color||'#5be2ef',.1,.7,top?.color||'#5be2ef',.8),obj.group);line.position.y=-.02;line.rotation.x=Math.PI/2;obj.group.userData.tail=line;}else tail.visible=!!p.charging||!!p.boost||!!p.countering;
  }
  for(const [id,obj] of models)if(!active.has(id)){scene.remove(obj.group);obj.group.traverse(o=>{if(o.isMesh){o.geometry.dispose();o.material.dispose();}});models.delete(id);}
  const activeTarget=models.get(state.targetId);targetIndicator.visible=!!(activeTarget&&s?.fighters?.find(x=>x.id===state.targetId)?.alive);
  if(activeTarget){targetIndicator.position.set(activeTarget.group.position.x,.4,activeTarget.group.position.z);marker.rotation.y+=dt*4;}
- const own=models.get(state.ownId);const center=own&&state.room?.status==='playing'?own.group.position.clone().multiplyScalar(.18):new THREE.Vector3();center.y=.5;
+ const center=new THREE.Vector3(0,.5,0); // identical default camera focus for all multiplayer clients
  const pitch=camPitch,dist=mobile?zoom*1.05:zoom;
  const desired=new THREE.Vector3(Math.sin(cameraYaw)*Math.cos(pitch)*dist,Math.sin(pitch)*dist,Math.cos(cameraYaw)*Math.cos(pitch)*dist).add(center);
  if(shake>.001){desired.x+=(Math.random()-.5)*shake;desired.y+=(Math.random()-.5)*shake;shake*=Math.pow(.03,dt);}else shake=0;

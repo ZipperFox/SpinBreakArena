@@ -116,7 +116,7 @@ function resume(ws,token){
     if(p.ws&&p.ws!==ws)disconnect(p.ws);
     ws.id=p.id;ws.room=r;p.ws=ws;p.connected=true;p.lostAt=0;
     send(ws,{t:'joined',id:ws.id,room:publicRoom(r),token:p.token,resumed:true});
-    if(r.status==='playing')send(ws,snapshot(r));
+    if(r.status==='playing'){const snap=snapshot(r);snap.round=r.round;snap.seq=r.frameSeq;snap.serverNow=now();send(ws,snap);}
     if(r.status==='results')send(ws,{t:'result',results:r.results});
     updateLobby(r);return;
   }
@@ -142,14 +142,14 @@ function createRoom(ws, msg, joinCode) {
 }
 // Rapier 3D runs exclusively on the server. The browser only renders snapshots.
 let engine;
-function event(r,kind,msg,id,amount,extra={}){const e={t:'event',kind,msg,id,amount,...extra,seq:crypto.randomBytes(3).toString('hex')};r.events.push(e);if(r.events.length>12)r.events.shift();broadcast(r,e);}
+function event(r,kind,msg,id,amount,extra={}){const e={t:'event',kind,msg,id,amount,...extra,round:r.round,at:+r.age.toFixed(4),seq:crypto.randomBytes(3).toString('hex')};r.events.push(e);if(r.events.length>12)r.events.shift();broadcast(r,e);}
 function ko(r,p,reason){if(!p.alive)return;p.alive=false;p.koReason=reason;if(p.body){try{p.body.setEnabled(false)}catch{}}
  event(r,'ko',`${p.name} ${reason==='擊出場外'?'被重擊轟出場外！':reason==='停止轉動'?'翻倒／停止轉動！':reason+'！'}`,p.id,0);
  if(r.status==='playing'&&r.fighters.filter(f=>f.alive).length<=1)finish(r);
 }
 function finish(r){if(r.status!=='playing')return;const ranked=[...r.fighters].sort((a,b)=>Number(b.alive)-Number(a.alive)||b.spin-a.spin||a.wobble-b.wobble);
  r.results=ranked.map((p,i)=>({id:p.id,name:p.name,top:p.top,rank:i+1,spin:Math.round(p.spin),reason:p.koReason|| (i===0?'最後旋轉者':'轉速判定')}));
- r.status='results';broadcast(r,{t:'result',results:r.results});updateLobby(r);
+ r.status='results';broadcastFrame(r);broadcast(r,{t:'result',round:r.round,results:r.results});updateLobby(r);
 }
 function fightersFor(r){const members=r.players.filter(p=>!p.bot).map(p=>({...p}));const picks=TOPS.slice();for(let i=picks.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[picks[i],picks[j]]=[picks[j],picks[i]];}
  for(let i=0;i<r.bots;i++)members.push({id:'bot'+i,name:['烈焰','閃電','旋風'][i]+'機神',top:picks[(i+r.round*3)%picks.length].id,build:{ratchet:PARTS.ratchets[(i+r.round)%PARTS.ratchets.length].id,bit:PARTS.bits[(i*3+r.round)%PARTS.bits.length].id},launch:validLaunch({angle:(i-1)*16,power:78+(i%3)*7,lane:(i%3)-1}),bot:true});
@@ -158,11 +158,23 @@ function fightersFor(r){const members=r.players.filter(p=>!p.bot).map(p=>({...p}
 function start(r){if(r.status!=='lobby')return;if(r.players.filter(x=>x.connected).length<1||r.players.some(x=>!x.connected))return;if(r.players.length+r.bots<2)return;
  const active=[...rooms.values()].filter(x=>x.status==='playing').length;
  if(active>=12){broadcast(r,{t:'error',msg:'3D 物理房間已滿，請稍後再開房'});return;}
- r.round++;r.status='playing';r.age=0;r.results=null;r.hitPairs.clear();r.events=[];
+ r.round++;r.frameSeq=0;r.status='playing';r.age=0;r.results=null;r.hitPairs.clear();r.events=[];
  try{r.fighters=fightersFor(r);}catch(e){r.status='lobby';console.error('[physics3d]',e);broadcast(r,{t:'error',msg:'3D 物理引擎初始化失敗'});return;}
- broadcast(r,{t:'room',room:publicRoom(r)});event(r,'start','3D PHYSICS / LET IT RIP!','',0);
+ broadcast(r,{t:'room',room:publicRoom(r)});broadcastFrame(r);event(r,'start','3D PHYSICS / LET IT RIP!','',0);
 }
-function tickRoom(r,dt){return engine.tick(r,dt);}
+function broadcastFrame(r){
+ if(!engine||!r.fighters?.length)return;
+ const state=engine.snapshot(r);
+ state.round=r.round;
+ state.seq=++r.frameSeq;
+ state.serverNow=now();
+ broadcast(r,state);
+}
+function tickRoom(r,dt){
+ if(r.status!=='playing')return;
+ engine.tick(r,dt);
+ if(r.status==='playing')broadcastFrame(r);
+}
 function charge(r,p,id){return engine.charge(r,p,id);}
 function skill(r,p){return engine.skill(r,p);}
 function snapshot(r){return engine.snapshot(r);}
@@ -172,7 +184,7 @@ const arenaEdge=()=>{};const collide=()=>{};
 function handle(ws,msg){if(!msg||typeof msg!=='object'||typeof msg.t!=='string')return;const r=ws.room;
  switch(msg.t){
   case 'resume':return resume(ws,msg.token);
-  case 'ping':return send(ws,{t:'pong'});
+  case 'ping':return send(ws,{t:'pong',sentAt:Number.isFinite(msg.sentAt)?msg.sentAt:null,serverNow:now()});
   case 'create':return createRoom(ws,msg,null);
   case 'join':return createRoom(ws,msg,msg.code);
   case 'leave':return exitRoom(ws);
@@ -197,7 +209,7 @@ function parseFrames(ws,chunk){ws.buffer=Buffer.concat([ws.buffer,chunk]);if(ws.
  } }
 const mime={'.webmanifest':'application/manifest+json','.png':'image/png','.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.ico':'image/x-icon'};
 const server=http.createServer((req,res)=>{
-  if(req.url==='/health'){res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({ok:true,game:'spin-break-arena',version:'10.0',physics:'rapier3d',rooms:rooms.size,uptime:Math.round(process.uptime())}));return;}
+  if(req.url==='/health'){res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({ok:true,game:'spin-break-arena',version:'10.1',physics:'rapier3d',rooms:rooms.size,uptime:Math.round(process.uptime())}));return;}
   if(req.method!=='GET'&&req.method!=='HEAD'){res.writeHead(405);res.end('Method not allowed');return;}
   let uri;try{uri=decodeURIComponent((req.url||'/').split('?')[0]);}catch{res.writeHead(400);res.end('Invalid path');return;}const file=path.resolve(ROOT,'.'+(uri==='/'?'/index.html':uri));
   if(!file.startsWith(ROOT+path.sep)){res.writeHead(403);res.end();return;}
@@ -212,14 +224,14 @@ server.on('upgrade',(req,sock,head)=>{
   sock.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: '+key+'\r\n\r\n');
   const ws={id:'P'+(++nextClient),sock,closed:false,buffer:Buffer.alloc(0),room:null,rateStart:now(),rateCount:0};sockets.add(ws);
   sock.on('data',c=>{if(!ws.closed)parseFrames(ws,c);});sock.on('close',()=>disconnect(ws));sock.on('error',()=>disconnect(ws));sock.setNoDelay(true);if(head.length)parseFrames(ws,head);
-  send(ws,{t:'hello',id:ws.id,tops:TOPS,arenas:ARENAS,parts:PARTS,version:'10.0' });
+  send(ws,{t:'hello',id:ws.id,tops:TOPS,arenas:ARENAS,parts:PARTS,version:'10.1' });
 });
 if (require.main === module) {
   PHYSICS.init().then(()=>{engine=PHYSICS.makeEngine(TOPS,PARTS,{event,ko,finish});console.log('[SPIN//BREAK] RAPier 3D engine initialized');}) .catch(e=>{console.error('[SPIN//BREAK] Rapier initialization failed:',e);process.exit(1);});
   setInterval(()=>{for(const r of rooms.values())if(r.status==='playing')tickRoom(r,DT);},1000/TPS);
-  setInterval(()=>{for(const r of rooms.values()){if(r.status==='playing')broadcast(r,snapshot(r));if(r.updated<now()-ROOM_IDLE_MS&&r.status!=='playing'){if(r.physics)engine.free(r);for(const p of r.players)if(!p.bot){send(p.ws,{t:'error',msg:'房間已逾時'});if(p.ws)p.ws.room=null;}rooms.delete(r.code);}}},50);
+  setInterval(()=>{for(const r of rooms.values()){if(r.updated<now()-ROOM_IDLE_MS&&r.status!=='playing'){if(r.physics)engine.free(r);for(const p of r.players)if(!p.bot){send(p.ws,{t:'error',msg:'房間已逾時'});if(p.ws)p.ws.room=null;}rooms.delete(r.code);}}},50);
   setInterval(()=>{for(const r of rooms.values())purgeAbsent(r);},2000);
-  const launch=setInterval(()=>{if(engine){clearInterval(launch);server.listen(PORT,HOST,()=>console.log(`[SPIN//BREAK] V10 / Rapier 3D | http://localhost:${PORT} | WebSocket /ws`));}},80);
+  const launch=setInterval(()=>{if(engine){clearInterval(launch);server.listen(PORT,HOST,()=>console.log(`[SPIN//BREAK] V10.1 / Rapier 3D | http://localhost:${PORT} | WebSocket /ws`));}},80);
   process.on('SIGINT',()=>{server.close();process.exit(0);});
 }
 module.exports={TOPS,PARTS,BLADE_FORMS,validLaunch,ARENAS,fightersFor,tickRoom,skill,charge,start,snapshot,publicRoom,server,massOf,arenaFeatures,arenaEdge,collide,validBuild};

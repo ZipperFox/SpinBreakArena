@@ -5,6 +5,17 @@ const els = Object.fromEntries(['roster','profile','topType','bigTop','topName',
 const ctx=els.stage.getContext('2d',{alpha:false});
 let ws,ownId=null,room=null,tops=[],arenas=[],parts={ratchets:[],bits:[]},selected='phoenix',build={ratchet:'wide7',bit:'taper',paint:null},launch={power:85,angle:0,lane:0},filter='全部',latest=null,vis={},particles=[],shockwaves=[],trails={},logEntries=[],lastEvent='',status='offline',audioOn=false,audioCtx=null,beatTimer=null,beatStep=0,soundCooldown=0;
 let playTime=0,flash=0,shake=0,bannerTimer=null,toastTimer=null,gameOverShown=false;
+const timeline=new window.SPINBREAK_SYNC.Timeline(160);
+const pendingEvents=[];let resultTimer=null,shownRound=null;
+function presentationState(){return timeline.sample()||latest;}
+function showSyncedEvents(){
+ const now=Date.now(),visualTime=timeline.visualTime;
+ for(let i=0;i<pendingEvents.length;){const x=pendingEvents[i];
+  if(x.round===timeline.round&&(visualTime+0.005>=x.at||now-x.receivedAt>850)){
+   pendingEvents.splice(i,1);handleEvent(x);
+  }else if(now-x.receivedAt>1500||x.round!==timeline.round){pendingEvents.splice(i,1);}else i++;
+ }
+}
 const storageKey='spinbreak-session-v2';
 let reconnectTimer=null,everConnected=false,waitForResume=false,lastServerSeen=Date.now();
 const queryRoom=(new URLSearchParams(location.search).get('room')||'').slice(0,5).toUpperCase();
@@ -13,7 +24,7 @@ const readSession=()=>{try{return JSON.parse(sessionStorage.getItem(storageKey)|
 const clearSession=()=>{try{sessionStorage.removeItem(storageKey);}catch{}};
 try{const previousName=localStorage.getItem('spinbreak-player-name');if(previousName)els.playerName.value=previousName;const b=JSON.parse(localStorage.getItem('spinbreak-build-v4')||'null');if(b?.top)selected=b.top;if(b?.ratchet)build.ratchet=b.ratchet;if(b?.bit)build.bit=b.bit;if(/^#[0-9a-f]{6}$/i.test(b?.paint||''))build.paint=b.paint;const l=JSON.parse(localStorage.getItem('spinbreak-launch-v9')||'null');if(l)launch={power:Math.max(55,Math.min(100,+l.power||85)),angle:Math.max(-40,Math.min(40,+l.angle||0)),lane:[-1,0,1].includes(+l.lane)?+l.lane:0};}catch{}
 const input={charge:false,burst:false};let targetId=null;
-window.SPINBREAK_3D_BRIDGE={getState:()=>({latest,room,tops,parts,selected,build,launch,ownId,targetId}),setTarget:id=>{if(latest?.fighters?.some(p=>p.id===id&&p.alive&&id!==ownId)){targetId=id;notify('鎖定 '+latest.fighters.find(p=>p.id===id).name);updateChargeUI();}}};
+window.SPINBREAK_3D_BRIDGE={getState:()=>{const visual=presentationState();showSyncedEvents();return {latest:visual,room,tops,parts,selected,build,launch,ownId,targetId};},setTarget:id=>{if(latest?.fighters?.some(p=>p.id===id&&p.alive&&id!==ownId)){targetId=id;notify('鎖定 '+latest.fighters.find(p=>p.id===id).name);updateChargeUI();}}};
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const hypot=(x,y)=>Math.hypot(x,y);
 const escapeHTML = s => String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -27,7 +38,7 @@ function network(){
  status='connecting';netUI();clearTimeout(reconnectTimer);
  let sock;try{sock=new WebSocket(`${scheme}//${location.host}/ws`);}catch{status='offline';netUI();reconnectTimer=setTimeout(network,2300);return;}
  ws=sock;
- sock.onopen=()=>{if(ws!==sock)return;status='online';everConnected=true;lastServerSeen=Date.now();netUI();};
+ sock.onopen=()=>{if(ws!==sock)return;status='online';everConnected=true;lastServerSeen=Date.now();netUI();send({t:'ping',sentAt:Date.now()});};
  sock.onclose=()=>{if(ws!==sock)return;status='offline';netUI();if(room){showMsg('網路暫時中斷，正在保留你的席位並自動重連…','error');showOverlay('連線中斷，正在重連','請保持此頁開啟。網路恢復後將自動返回原房間，約 90 秒內可保留席位。','立即重連',()=>{ws=null;network();});}
  else if(!everConnected)showMsg('伺服器啟動中，正在自動重試…','error');
  reconnectTimer=setTimeout(network,2300);
@@ -44,17 +55,17 @@ function inviteOverlay(){
 function netUI(){els.netState.textContent=({online:'伺服器已連線',offline:'伺服器未連線',connecting:'正在連線'})[status];els.netDot.className='live-dot '+(status==='online'?'online':status==='offline'?'offline':'');}
 function onMessage(m){switch(m.t){
  case 'hello':ownId=m.id;tops=m.tops;arenas=m.arenas;parts=m.parts||parts;if(!tops.some(t=>t.id===selected))selected='phoenix';renderBuildOptions();renderRoster();renderProfile();renderArenaOptions();{const old=readSession();if(old?.token&&(!queryRoom||old.code===queryRoom)){waitForResume=true;send({t:'resume',token:old.token});}else{waitForResume=false;inviteOverlay();}}return;
- case 'resume_failed':waitForResume=false;clearSession();room=null;latest=null;renderLobby();if(queryRoom)inviteOverlay();else showOverlay('準備進入戰場','點擊建立房間，即可與 AI 練習或邀請朋友','立即開始對戰',()=>els.btnCreate.click());return;
- case 'joined':ownId=m.id;room=m.room;waitForResume=false;{const mine=room.players.find(p=>p.id===ownId);if(mine){selected=mine.top;build=mine.build||build;launch=mine.launch||launch;syncGarageControls();renderBuildOptions();renderRoster();renderProfile();}}if(m.token)saveSession(m.token,room.code);if(!m.resumed){latest=null;vis={};trails={};particles=[];logEntries=[];gameOverShown=false;targetId=null;}renderLobby();
+ case 'resume_failed':waitForResume=false;clearSession();timeline.reset();pendingEvents.length=0;room=null;latest=null;renderLobby();if(queryRoom)inviteOverlay();else showOverlay('準備進入戰場','點擊建立房間，即可與 AI 練習或邀請朋友','立即開始對戰',()=>els.btnCreate.click());return;
+ case 'joined':ownId=m.id;room=m.room;waitForResume=false;{const mine=room.players.find(p=>p.id===ownId);if(mine){selected=mine.top;build=mine.build||build;launch=mine.launch||launch;syncGarageControls();renderBuildOptions();renderRoster();renderProfile();}}if(m.token)saveSession(m.token,room.code);if(m.resumed){timeline.reset();pendingEvents.length=0;}if(!m.resumed){timeline.reset();pendingEvents.length=0;latest=null;vis={};trails={};particles=[];logEntries=[];gameOverShown=false;targetId=null;}renderLobby();
  if(room.status==='lobby'){showOverlay(m.resumed?'歡迎回到競技場！':'集結！準備開戰','分享邀請連結給朋友，所有玩家選好陀螺後由房主開戰',room.host===ownId?'開始戰鬥':'等待房主開始',()=>room?.host===ownId?send({t:'start'}):notify('等待房主開始戰鬥'));}
  else if(room.status==='playing')hideOverlay();
  showMsg((m.resumed?'已恢復連線：':'已進入房間：')+room.code,'success');return;
- case 'room':room=m.room;renderLobby();if(room.status==='playing')hideOverlay();return;
- case 'tick':latest=m;if(room&&room.status==='playing'){renderAnomaly();els.gameTimer.textContent=formatTime(90-m.time);els.roundState.textContent='BATTLE LIVE';renderScores();renderHud();updateChargeUI();}return;
- case 'event':handleEvent(m);return;
- case 'result':showResults(m.results);return;
+ case 'room':{const oldStatus=room?.status,oldRound=room?.round;room=m.room;if(room.status==='lobby'&&(oldStatus==='results'||oldStatus==='playing')){timeline.reset();pendingEvents.length=0;latest=null;}if(room.status==='playing'&&oldRound!==room.round){timeline.reset();pendingEvents.length=0;latest=null;gameOverShown=false;}renderLobby();if(room.status==='playing')hideOverlay();return;}
+ case 'tick':if(!timeline.receive(m))return;latest=m;if(room&&room.status==='playing'){renderAnomaly();els.gameTimer.textContent=formatTime(90-m.time);els.roundState.textContent='BATTLE LIVE';renderScores();renderHud();updateChargeUI();}return;
+ case 'event':if(m.kind==='start'){handleEvent(m);return;}if(Number.isFinite(m.at)&&Number.isFinite(m.round)){pendingEvents.push({...m,receivedAt:Date.now()});}else handleEvent(m);return;
+ case 'result':clearTimeout(resultTimer);resultTimer=setTimeout(()=>showResults(m.results),Math.max(280,timeline.delayMs+140));return;
  case 'error':showMsg(m.msg,'error');notify(m.msg);if(queryRoom&&!room)inviteOverlay();return;
- case 'pong':return;
+ case 'pong':timeline.pong(m);return;
 }}
 function renderAnomaly(){
  const a=latest?.anomaly;
@@ -275,9 +286,10 @@ function drawTopBody(x,y,r,col,acc,ang,build){ctx.save();ctx.translate(x,y);ctx.
  for(let i=0;i<5;i++){const a=i*TAU/5;ctx.save();ctx.rotate(a);ctx.fillStyle=acc;ctx.beginPath();ctx.moveTo(-3,-8);ctx.lineTo(0,-17);ctx.lineTo(5,-8);ctx.closePath();ctx.fill();ctx.restore();}
  ctx.fillStyle='#16253a';pathCircle(0,0,8);ctx.fill();const bitId=build?.bit||'taper';ctx.fillStyle=bitId==='gear'?'#8ef5ff':bitId==='rubber'?'#ffbb66':acc;if(bitId==='needle'){ctx.beginPath();ctx.moveTo(0,-8);ctx.lineTo(8,5);ctx.lineTo(-8,5);ctx.closePath();ctx.fill();}else if(bitId==='flat'||bitId==='rush'){ctx.fillRect(-6,-6,12,12);}else{pathCircle(0,0,bitId==='ball'?6.6:5.3);ctx.fill();}glowCircle(0,0,2.3,'#fff8e8',5);ctx.restore();}
 function introDuel(t){const c1={id:'intro1',name:'緋焰鳳凰',x:Math.cos(t*.6)*112,y:Math.sin(t*.6)*98,spin:90,cool:3,alive:true,shield:false,boost:true};const c2={id:'intro2',name:'雷霆迅鷹',x:Math.cos(t*.67+PI)*120,y:Math.sin(t*.67+PI)*95,spin:75,cool:2,alive:true,shield:false,boost:false};drawTop(c1,getTop('phoenix')||{color:'#f65c46',accent:'#ffd16a',cd:10},t,0);drawTop(c2,getTop('raptor')||{color:'#ffdf61',accent:'#aceefa',cd:10},t,0);}
-function frame(now){if(window.SPIN3D_READY){requestAnimationFrame(frame);return;}const dt=clamp((now-renderLast)/1000,0,.055);renderLast=now;playTime+=dt;canvasResize();ctx.save();ctx.setTransform(scale,0,0,scale,0,0);ctx.clearRect(0,0,W,H);const offs=shake>0?(Math.random()-.5)*shake:0;ctx.translate(offs,offs*.7);shake=Math.max(0,shake-dt*24);bg(playTime);drawArena(playTime,room?.arena||'colosseum',latest?.radius||235,latest?.time||0);drawGeometry(latest?.geometry||null,latest?.radius||235,playTime);
- if(latest?.fighters&&(room?.status==='playing'||room?.status==='results')){const ids=new Set();for(const p of latest.fighters){ids.add(p.id);let v=vis[p.id];if(!v){v=vis[p.id]={x:p.x,y:p.y};}const lerp=clamp(dt*24,0,1);v.x+=(p.x-v.x)*lerp;v.y+=(p.y-v.y)*lerp;const t=getTop(p.top);if(t)drawTop({...p,x:v.x,y:v.y},t,playTime,dt);}
+function frame(now){if(window.SPIN3D_READY){requestAnimationFrame(frame);return;}showSyncedEvents();const dt=clamp((now-renderLast)/1000,0,.055);renderLast=now;playTime+=dt;canvasResize();ctx.save();ctx.setTransform(scale,0,0,scale,0,0);ctx.clearRect(0,0,W,H);const offs=shake>0?(Math.random()-.5)*shake:0;ctx.translate(offs,offs*.7);shake=Math.max(0,shake-dt*24);bg(playTime);drawArena(playTime,room?.arena||'colosseum',presentationState()?.radius||235,presentationState()?.time||0);drawGeometry(presentationState()?.geometry||null,presentationState()?.radius||235,playTime);
+ const visual=presentationState();if(visual?.fighters&&(room?.status==='playing'||room?.status==='results')){const ids=new Set();for(const p of visual.fighters){ids.add(p.id);let v=vis[p.id];if(!v){v=vis[p.id]={x:p.x,y:p.y};}v.x=p.x;v.y=p.y;const t=getTop(p.top);if(t)drawTop({...p,x:v.x,y:v.y},t,playTime,dt);}
  for(const id of Object.keys(trails))if(!ids.has(id))delete trails[id];}else if(tops.length)introDuel(playTime);
  drawWaves(dt);drawParticles(dt);ctx.restore();if(flash>0){flash-=dt;ctx.save();ctx.fillStyle=`rgba(255,246,227,${flash*.4})`;ctx.fillRect(0,0,W,H);ctx.restore();}requestAnimationFrame(frame);}
-network();setInterval(()=>{if(ws?.readyState===WebSocket.OPEN){if(Date.now()-lastServerSeen>50000)ws.close();else send({t:'ping'});}},20000);requestAnimationFrame(frame);
+window.addEventListener('visibilitychange',()=>{if(!document.hidden&&ws?.readyState===WebSocket.OPEN)send({t:'ping',sentAt:Date.now()});});
+network();setInterval(()=>{if(ws?.readyState===WebSocket.OPEN){if(Date.now()-lastServerSeen>50000)ws.close();else send({t:'ping',sentAt:Date.now()});}},8000);requestAnimationFrame(frame);
 })();
