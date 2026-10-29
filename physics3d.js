@@ -40,7 +40,7 @@ function makeEngine(tops,parts,callbacks){
    const danger=Math.abs(Math.abs(Math.sin(a))-1)<.043;
    const portal=Math.abs(Math.sin(a))<.19;
    if(danger||portal)continue;
-   const guard=fixed(r,R.ColliderDesc.cylinder(1.0,.225),5.75*Math.cos(a),.82,5.75*Math.sin(a),.58,.10);
+   const guard=fixed(r,R.ColliderDesc.cylinder(1.68,.225),5.75*Math.cos(a),1.50,5.75*Math.sin(a),.58,.10);
    r.physics.guardColliders.add(guard.handle);
   }
   for(const [x,z,rad] of r.physics.pillars){fixed(r,R.ColliderDesc.cylinder(.35,rad),x,.38,z,.86,.27);}
@@ -48,7 +48,7 @@ function makeEngine(tops,parts,callbacks){
   // jump their low spherical bumpers or escape the outer lane at speed.
   for(const side of [-1,1])for(let i=0;i<22;i++){
    const a=(side===1?0:Math.PI)+(i-10.5)*.043;
-   const wall=fixed(r,R.ColliderDesc.cylinder(.88,.245),6.84*Math.cos(a),.75,6.84*Math.sin(a),.50,.08);
+   const wall=fixed(r,R.ColliderDesc.cylinder(1.40,.245),6.84*Math.cos(a),1.27,6.84*Math.sin(a),.50,.08);
    r.physics.railColliders.add(wall.handle);
   }
  }
@@ -262,13 +262,28 @@ function makeEngine(tops,parts,callbacks){
    }
   });
   phy.queue.drainCollisionEvents(()=>{});
-  for(const p of r.fighters){if(!p.alive)continue;spinStop(r,p);if(!p.alive)continue;enterLane(r,p);
+  // Anti-vault safety: a normal bumper contact must not turn top spin into a
+  // vertical catapult. Only act in the protected rim, leaving real N/S exit
+  // pockets and the E/W return lanes untouched. Center-field aerial KOs stay.
+  for(const p of r.fighters){if(!p.alive)continue;
+   const b=p.body,pos=b.translation(),dist=length(pos.x,pos.z),sine=dist>0?Math.abs(pos.z/dist):0;
+   const protectedWall=dist>4.35&&dist<6.55&&sine>=.20&&sine<=.978;
+   if(protectedWall){
+      const vel=b.linvel();
+      if(pos.y>.72&&vel.y>.55)b.setLinvel(V(vel.x,.55,vel.z),true);
+      if(dist>5.96){ // emergency guard containment only if the rigid-body solver leaked through a segment
+         const nx=pos.x/dist,nz=pos.z/dist,outward=vel.x*nx+vel.z*nz;
+         b.setTranslation(V(nx*5.48,Math.min(pos.y,1.72),nz*5.48),true);
+         b.setLinvel(V(vel.x-nx*Math.max(0,outward)*1.6,Math.min(vel.y,.4),vel.z-nz*Math.max(0,outward)*1.6),true);
+      }
+   }
+   spinStop(r,p);if(!p.alive)continue;enterLane(r,p);
    if(p.railTimer>0)p.railTimer=Math.max(0,p.railTimer-TICK);
    p.railCooldown=Math.max(0,p.railCooldown-TICK);
    if(p.impact>0)p.impact=Math.max(0,p.impact-TICK);
    // Open dangerous north/south pockets: knockout on momentum, rather than removing all walls.
-   const pos=p.body.translation(),v=p.body.linvel(),out=Math.hypot(pos.x,pos.z);
-   if(out>5.9&&Math.abs(pos.z)>4.5&&Math.abs(pos.x)<2.0&&length(v.x,v.z)>2.5){callbacks.ko(r,p,'擊出場外');}
+   const nowPos=p.body.translation(),v=p.body.linvel(),out=Math.hypot(nowPos.x,nowPos.z);
+   if(out>5.9&&Math.abs(nowPos.z)>4.5&&Math.abs(nowPos.x)<2.0&&length(v.x,v.z)>2.5){callbacks.ko(r,p,'擊出場外');}
   }
  }
  function tick(r,dt){if(r.status!=='playing')return;r.age+=dt;
