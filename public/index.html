@@ -20,9 +20,9 @@
   <div class="background-fx" aria-hidden="true"></div>
   <header class="site-header">
     <div class="brand"><div class="brand-mark"><span class="mark-disc"></span><span class="mark-core"></span></div><div><div class="brand-title">SPIN<span>//</span>BREAK</div><div class="brand-sub">ARENA · 次世代陀螺競技</div></div></div>
-    <div class="header-right"><div class="live-tag"><span class="live-dot" id="netDot"></span><span id="netState">正在連線</span></div><button id="btnSound" class="icon-btn" title="切換音效與節奏音樂">♫ <span id="soundText">音效關</span></button><span class="version">V6.0 · TRUE 3D IMPACT</span></div>
+    <div class="header-right"><div class="live-tag"><span class="live-dot" id="netDot"></span><span id="netState">正在連線</span></div><button id="btnSound" class="icon-btn" title="切換音效與節奏音樂">♫ <span id="soundText">音效關</span></button><span class="version">V9.0 · IMPACT / LAUNCH / GARAGE</span></div>
   </header>
-  <div class="marquee"><div class="marquee-inner"><span>IGNITE YOUR SPIRIT <b>✦</b> 超越極限的碰撞 <b>✦</b> 576 種改造組合 <b>✦</b> 5 大決戰舞台 <b>✦</b> <strong>LET IT RIP</strong> <b>✦</b> 引爆你的鬥志 <b>✦</b> </span><span aria-hidden="true">IGNITE YOUR SPIRIT <b>✦</b> 超越極限的碰撞 <b>✦</b> 576 種改造組合 <b>✦</b> 5 大決戰舞台 <b>✦</b> <strong>LET IT RIP</strong> <b>✦</b> 引爆你的鬥志 <b>✦</b> </span></div></div>
+  <div class="marquee"><div class="marquee-inner"><span>IGNITE YOUR SPIRIT <b>✦</b> 超越極限的碰撞 <b>✦</b> 576 種物理改造組合 <b>✦</b> 5 大決戰舞台 <b>✦</b> <strong>LET IT RIP</strong> <b>✦</b> 引爆你的鬥志 <b>✦</b> </span><span aria-hidden="true">IGNITE YOUR SPIRIT <b>✦</b> 超越極限的碰撞 <b>✦</b> 576 種物理改造組合 <b>✦</b> 5 大決戰舞台 <b>✦</b> <strong>LET IT RIP</strong> <b>✦</b> 引爆你的鬥志 <b>✦</b> </span></div></div>
   <main class="layout">
     <aside class="left-col">
       <div class="section-heading"><div><div class="eyebrow">01 / YOUR WEAPON</div><h2>選擇戰鬥陀螺</h2></div><span class="micro-num">12 TYPES</span></div>
@@ -55,11 +55,25 @@
       <div class="panel room-panel">
         <div class="panel-kicker">PLAYER IDENTITY / 玩家資訊</div>
         <label class="field-label" for="playerName">暱稱</label><input id="playerName" maxlength="16" autocomplete="off" value="挑戰者" placeholder="輸入你的戰鬥名稱" />
-        <div class="customize-panel"><div class="panel-kicker">BUILD YOUR TOP / 三層自由改造 · 576 種組合</div>
+        <div class="customize-panel"><div class="panel-kicker">V9 · CUSTOM GARAGE / 3D 零件車庫 · 576 種組合</div>
+          <canvas id="garage3d" class="garage-3d" width="500" height="280" aria-label="3D 零件爆炸視圖，可檢查不同刀刃形狀"></canvas>
+          <div class="garage-hint">3D 爆炸視圖｜刀刃、棘輪、軸心逐層組裝</div>
           <label for="bladeSelect" class="field-label">① 刀刃 Blade · 撞擊形狀</label><select id="bladeSelect"></select>
           <label for="ratchetSelect" class="field-label">② 棘輪 Ratchet · 重量與重心</label><select id="ratchetSelect"></select>
           <label for="bitSelect" class="field-label">③ 軸心 Bit · 移動／抓地／軌道</label><select id="bitSelect"></select>
+          <label class="field-label" for="paintSelect">④ 陀螺主色塗裝 Paint</label>
+          <div class="paint-row"><input id="paintSelect" type="color" value="#ff613f" aria-label="選擇主色"/><button id="paintReset" type="button" class="secondary-btn">恢復原色</button></div>
           <div id="buildInfo" class="build-info">正在載入改造零件…</div>
+          <div class="garage-presets"><label class="field-label" for="presetSelect">我的配裝預設（儲存在此裝置）</label><div class="preset-row"><select id="presetSelect" aria-label="配裝預設"><option value="0">配裝 1</option><option value="1">配裝 2</option><option value="2">配裝 3</option></select><button id="presetSave" type="button" class="secondary-btn">儲存</button><button id="presetLoad" type="button" class="secondary-btn">套用</button></div></div>
+          <div class="launch-panel"><div class="panel-kicker">V8 · LAUNCH TACTICS / 發射戰術</div>
+            <label class="field-label" for="launchPower">發射力度 <output id="launchPowerValue">85%</output></label>
+            <input id="launchPower" type="range" min="55" max="100" step="1" value="85" />
+            <label class="field-label" for="launchAngle">發射角度 <output id="launchAngleValue">0°</output></label>
+            <input id="launchAngle" type="range" min="-40" max="40" step="5" value="0" />
+            <label class="field-label" for="launchLane">發射路線</label>
+            <select id="launchLane"><option value="-1">偏左弧線</option><option value="0" selected>中央切入</option><option value="1">偏右弧線</option></select>
+            <div class="launch-hint">發射設定會改變開場剛體位置、速度方向與初始轉速；開戰後不可更改。</div>
+          </div>
         </div>
         <button class="primary-btn" id="btnCreate">一鍵建立房間 <span>＋</span></button>
         <div class="or-line"><span>或使用房間代碼加入</span></div>

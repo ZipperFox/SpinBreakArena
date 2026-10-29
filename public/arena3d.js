@@ -61,25 +61,61 @@ function createStage(name){battleground.clear();stageName=name;
 }
 const models=new Map(),effects=[];
 function buildTop(top,parts){
- const [main,accent]=[top.color||'#ff7355',top.accent||'#ffe8ab'];
+ const [main,accent]=[parts?.paint||top.color||'#ff7355',top.accent||'#ffe8ab'];
  const root=new THREE.Group();root.userData.fighterId=null;
- const metal=mat('#182f48',.89,.23),blade=mat(main,.62,.28,main,.19),edge=mat(accent,.81,.2,accent,.43),dark=mat('#090f1f',.86,.3);
- const tip=mesh(new THREE.ConeGeometry(.10,.32,16),mat('#ecfaff',.65,.2),root);tip.position.y=-.28;tip.rotation.z=Math.PI;
- const lower=mesh(new THREE.CylinderGeometry(.30,.24,.17,24),metal,root);lower.position.y=-.1;
+ const bladePart=new THREE.Group(),ratchetPart=new THREE.Group(),bitPart=new THREE.Group();
+ root.add(bladePart,ratchetPart,bitPart);root.userData.assemblies={bladePart,ratchetPart,bitPart};
+ const metal=mat('#182f48',.88,.25),blade=mat(main,.65,.28,main,.23),edge=mat(accent,.84,.22,accent,.48);
+ const form=top.blade||{lobes:5,reach:.39,tip:.13,shape:'wave'};
+ const base=mesh(new THREE.CylinderGeometry(.31,.31,.25,40),blade,bladePart);base.position.y=.05;base.castShadow=!mobile;
+ const rim=mesh(new THREE.TorusGeometry(.31,.048,9,48),edge,bladePart);rim.rotation.x=Math.PI/2;rim.position.y=.165;
+ for(let i=0;i<form.lobes;i++){
+  const a=Math.PI*2*i/form.lobes+(form.shape==='swept'?.10:0),rr=form.reach-(i%2&&form.shape==='hammer'?.04:0);
+  const lobe=mesh(new THREE.SphereGeometry(form.tip,12,9),i%2?blade:edge,bladePart);
+  lobe.position.set(Math.cos(a)*rr,.05+(form.shape==='axe'?.07:0),Math.sin(a)*rr);
+  lobe.castShadow=!mobile;
+  const spoke=mesh(new THREE.BoxGeometry(.29,.08,.11),blade,bladePart);
+  spoke.position.set(Math.cos(a)*rr*.65,.075,Math.sin(a)*rr*.65);spoke.rotation.y=-a;
+ }
  const gear=parts?.ratchet==='dense9'?9:parts?.ratchet==='swift2'?2:parts?.ratchet==='wide7'?7:parts?.ratchet==='heavy5'?5:parts?.ratchet==='tall4'?4:3;
- const body=mesh(new THREE.CylinderGeometry(.47,.44,.22,gear*6),blade,root);body.position.y=.035;body.castShadow=!mobile;
- const rim=mesh(new THREE.TorusGeometry(.45,.068,10,42),edge,root);rim.rotation.x=Math.PI/2;rim.position.y=.14;
- const topPlate=mesh(new THREE.CylinderGeometry(.28,.32,.045,24),metal,root);topPlate.position.y=.17;
- const crown=mesh(new THREE.CylinderGeometry(.16,.23,.12,16),edge,root);crown.position.y=.26;
- const gem=mesh(new THREE.SphereGeometry(.095,14,10),mat('#fff9e9',.45,.1,accent,1.1),root);gem.position.y=.33;
- for(let i=0;i<gear;i++){const angle=i*Math.PI*2/gear;const spike=mesh(new THREE.BoxGeometry(.20,.13,.19),i%2===0?edge:blade,root);spike.position.set(Math.cos(angle)*.48,.055,Math.sin(angle)*.48);spike.rotation.y=-angle;}
- for(let i=0;i<5;i++){const angle=i*Math.PI*2/5;const bolt=mesh(new THREE.SphereGeometry(.037,9,7),edge,root);bolt.position.set(.32*Math.cos(angle),.15,.32*Math.sin(angle));}
+ const lower=mesh(new THREE.CylinderGeometry(.235,.22,.13,28),metal,ratchetPart);lower.position.y=-.115;
+ for(let j=0;j<gear;j++){
+  const a=Math.PI*2*j/gear;
+  const tooth=mesh(new THREE.SphereGeometry(.055,9,7),j%2?edge:metal,ratchetPart);tooth.position.set(Math.cos(a)*.235,-.115,Math.sin(a)*.235);
+ }
+ const tipRadius=parts?.bit==='ball'?.15:parts?.bit==='needle'?.085:parts?.bit==='rubber'?.145:.115;
+ const tip=mesh(new THREE.SphereGeometry(tipRadius,18,12),mat(parts?.bit==='rubber'?'#ff945f':'#e6faff',.52,.31),bitPart);
+ tip.position.y=-.25;
+ const inner=mesh(new THREE.CylinderGeometry(.17,.20,.04,24),metal,bladePart);inner.position.y=.18;
+ const gem=mesh(new THREE.SphereGeometry(.095,15,12),mat('#fff9e9',.4,.12,accent,.95),bladePart);gem.position.y=.245;
  return root;
+}
+// Garage preview displays the *same* blade lobes, ratchet teeth and tip geometry used by Rapier.
+const garageCanvas=document.getElementById('garage3d');
+let garageRenderer=null,garagePreview=null,garageKey='';const garageScene=new THREE.Scene();
+garageScene.background=new THREE.Color('#091321');
+const garageCamera=new THREE.PerspectiveCamera(35,1,.1,30);garageCamera.position.set(2.0,1.7,3.0);garageCamera.lookAt(0,0,0);
+garageScene.add(new THREE.HemisphereLight('#d8f3ff','#1b263a',2.6));
+const glight=new THREE.DirectionalLight('#ffcc9c',5);glight.position.set(-2,5,4);garageScene.add(glight);
+function updateGarage(state){
+ const top=state.tops?.find(t=>t.id===state.selected);
+ if(!top||!garageCanvas)return;
+ const key=[top.id,state.build?.ratchet,state.build?.bit,state.build?.paint].join('|');
+ if(key!==garageKey){
+  if(garagePreview){garageScene.remove(garagePreview);garagePreview.traverse(m=>{if(m.isMesh)m.geometry.dispose();});}
+  garagePreview=buildTop(top,state.build||{});garageScene.add(garagePreview);garageKey=key;
+  const {bladePart,ratchetPart,bitPart}=garagePreview.userData.assemblies;
+  bladePart.position.y=.36;ratchetPart.position.y=-.07;bitPart.position.y=-.45;
+ }
+ if(!garageRenderer){try{garageRenderer=new THREE.WebGLRenderer({canvas:garageCanvas,antialias:!mobile,powerPreference:'low-power'});garageRenderer.setPixelRatio(Math.min(devicePixelRatio||1,mobile?1.0:1.25));garageRenderer.outputColorSpace=THREE.SRGBColorSpace;}catch(e){console.warn('Garage preview unavailable',e);return;}}
+ const rc=garageCanvas.getBoundingClientRect(),w=Math.max(2,Math.round(rc.width)),h=Math.max(2,Math.round(rc.height));
+ if(garageRenderer.domElement.width!==w||garageRenderer.domElement.height!==h){garageRenderer.setSize(w,h,false);garageCamera.aspect=w/h;garageCamera.updateProjectionMatrix();}
+ garagePreview.rotation.y+=.018;garageRenderer.render(garageScene,garageCamera);
 }
 function spawnFx(x,y,z,color,power){const count=Math.min(44,10+Math.round(power/7));const material=new THREE.MeshBasicMaterial({color,transparent:true,depthWrite:false});
  for(let i=0;i<count;i++){const a=Math.random()*Math.PI*2,s=2+Math.random()*7;const m=mesh(new THREE.OctahedronGeometry(.045+Math.random()*.055),material.clone());m.position.set(x,y,z);effects.push({m,v:new THREE.Vector3(Math.cos(a)*s,Math.random()*3.9,Math.sin(a)*s),life:.2+Math.random()*.45,max:.65});}
 }
-let cameraYaw=.1,camPitch=.8,zoom=15,shake=0,freeze=0,oldFrame=performance.now(),lastArena='',time=0,baseline=null;
+let cameraYaw=.1,camPitch=.8,zoom=15,shake=0,freeze=0,oldFrame=performance.now(),lastGarageFrame=0,lastArena='',time=0,baseline=null;
 const source=()=>window.SPINBREAK_3D_BRIDGE?.getState?.()||{};
 window.addEventListener('spinbreak-impact',e=>{
  const ev=e.detail;if(!ev)return;
@@ -90,7 +126,12 @@ window.addEventListener('spinbreak-impact',e=>{
   const strength=ev.kind==='hit'?ev.amount||120:ev.kind==='charge'?130:80;
   spawnFx(x,.5,z,top?.accent||'#ffd392',strength);
   shake=Math.max(shake,Math.min(.72,(strength/280)*.52));
-  if(ev.kind==='hit'&&strength>170)freeze=.055;
+  if(ev.kind==='hit'&&strength>155){
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(.25,.044,8,44),new THREE.MeshBasicMaterial({color:'#fff5c1',transparent:true,opacity:.87,depthWrite:false}));
+    ring.rotation.x=Math.PI/2;ring.position.set(x,.5,z);scene.add(ring);
+    effects.push({m:ring,v:new THREE.Vector3(),life:.32,max:.32,ring:true});
+    freeze=Math.max(freeze,.095);
+  }
  }
 });
 const projector=new THREE.Raycaster(),mouse=new THREE.Vector2();let pointerStart=null;
@@ -127,8 +168,9 @@ function loop(t){requestAnimationFrame(loop);const dt=Math.min(.05,Math.max(.001
  cam.position.lerp(desired,Math.min(1,dt*5));cam.lookAt(center);
  battleground.rotation.y=0;
  for(let i=effects.length-1;i>=0;i--){const p=effects[i];p.life-=dt;if(p.life<=0){scene.remove(p.m);p.m.geometry.dispose();p.m.material.dispose();effects.splice(i,1);continue;}
-  p.v.y-=11*dt;p.m.position.addScaledVector(p.v,dt);p.m.material.opacity=THREE.MathUtils.clamp(p.life/p.max,0,1);}
- if(freeze>0){freeze-=dt;return;}
+  if(p.ring){p.m.scale.setScalar(1+(p.max-p.life)*10);}else{p.v.y-=11*dt;p.m.position.addScaledVector(p.v,dt);}p.m.material.opacity=THREE.MathUtils.clamp(p.life/p.max,0,1);}
+ if(freeze>0)freeze-=dt;
+ if(t-lastGarageFrame>45&&source().room?.status!=='playing'){lastGarageFrame=t;updateGarage(state);}
  renderer.render(scene,cam);
 }
 // Preserve the existing 2D renderer as a fallback only if WebGL setup fails.

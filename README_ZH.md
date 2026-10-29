@@ -1,34 +1,35 @@
-# SPIN//BREAK ARENA V6 — TRUE 3D PHYSICS
+# SPIN//BREAK ARENA V9 — IMPACT 2.0 / LAUNCH SYSTEM / CUSTOM GARAGE
 
-本版用 **Rapier 3D WebAssembly** 取代舊版平面碰撞，用 **Three.js WebGL** 畫出 3D 陀螺與立體競技場。運動、撞擊、傾斜、翻倒與角速度由伺服器上的 3D 剛體負責；手機僅呈現同步快照。
+這是整合 V7、V8、V9 的手機／桌面多人戰鬥陀螺版本，採伺服器權威 Rapier 3D 剛體物理與 Three.js 3D 視覺呈現。**這是物理誇張化遊戲，不是實體陀螺的工程級模擬。**
 
-## 玩法
+公開站點：https://spin-break-arena.onrender.com
 
-- 取消 WASD / 虛擬搖桿。陀螺自主巡航，玩家選擇敵人、按「衝鋒」或「必殺」影響剛體動量。
-- 上方刀刃、棘輪、軸心三段可改造：12 × 6 × 8，共 576 種配裝。零件影響質量、抓地力、轉速耗損、攻擊衝量、穩定性。
-- 場地有真實的 3D 防護球牆、固定撞擊柱、南北出界口、左右可進入的軌道輔助回場段。
-- 接觸力事件來自 Rapier 的真實碰撞；在此基礎上加上刻意放大的分離衝量與短暫拋飛，追求爽快的 **arcade physics（誇張化物理）**，不主張工業級真實陀螺動力學精度。
-- 以高速撞出場外、旋轉速度耗盡、翻倒判定 KO；不設血量。
-- 2–4 人 WebSocket 房間，後端判定勝負，預設 AI 練習，支援斷線恢復。
+## V7 — IMPACT 2.0
+- 12 款刀刃有不一樣的實體 **3D 複合碰撞器**：中央圓柱 + 2–10 個不同半徑、不同伸出長度的撞擊球體，造成不同外緣接觸輪廓與真實慣性分布。
+- 棘輪有 2–9 個物理齒輪碰撞器，軸心依零件使用不同的碰撞球半徑與抓地參數；Rapier 自動從幾何與密度計算質量與慣性。
+- 碰撞後反作用衝量、接觸角度造成的傾斜扭矩；重擊在 3D 畫面觸發擴散衝擊波、火花、鏡頭震動。後端決定飛行、轉速與淘汰，不以 HP 作為勝負判定。
 
-## 執行
+## V8 — LAUNCH SYSTEM
+- 發射力度 55%～100%、初始角度 -40°～+40°、發射路線（偏左／中央／偏右）。
+- 這些選項會在戰鬥建立剛體時，實際改變初始位置、速度方向、速度大小和轉速；遊戲進行中鎖定不能修改。
+- 依然取消自由移動：陀螺自動運動，玩家控制衝鋒與專屬必殺技。
 
-安裝 Node.js 22+，執行 `npm install`（包含 WebAssembly 物理套件，會測試 3D 核心），再執行 `npm start`，進入 `http://localhost:3000`。
+## V9 — CUSTOM GARAGE
+- 12 種刀刃 × 6 種棘輪 × 8 種軸心 = 576 種組合。
+- 3D 零件爆炸預覽採用與實體碰撞器一致的外型參數（異形刀刃外緣、齒輪數量、軸心半徑），不只靠貼圖顯示差異。
+- 主色自訂（6 位 HEX），伺服器驗證並在多人畫面同步；三組配裝預設、發射設定在單一裝置的 localStorage 儲存。
+- 沒有付費數值優勢。配裝預設僅存在該裝置，換手機或清除 Safari 網站資料會失去預設。
 
-公開網址： https://spin-break-arena.onrender.com
+## 如何執行
+- Node.js 22+。
+- `npm install`：安裝 Rapier 3D 與 Three.js，並於安裝後自動檢查 3D 物理、V9 新功能、四人 WebSocket 連線整合測試。 
+- `npm start`：開啟 http://localhost:3000 。正式託管使用 PORT 環境變數及 HTTPS/WSS 反向代理。
+- 其他檢查：`npm run test:3d`、`npm run test:v9`、`npm test`。
 
-Render 使用 `npm install --omit=dev`，安裝過程將 Three.js 模組複製到 `public/vendor/`，**遊玩時不需要額外第三方 CDN**。Node 伺服器預設 `PORT` 環境變數。
+## 測試與限制
+- `test_v9.js` 測試真實不同碰撞器、零件質量、發射速度與方向、配裝色彩及快照；`test_multiplayer.js` 檢查四人同房、改裝同步、發射設定同步、場地與技能。
+- 3D 碰撞使用簡化複合碰撞器，不是精密的實體玩具材質、軸承或幾何重建；撞擊效果經過誇張化調整。
+- 平衡沒有對 576 組配裝完成全組合、真人操作的大樣本驗證。手機 Safari 的 GPU 和多個 WebGL 畫面需要實機驗收。
+- Render Free 可能在閒置後休眠；伺服器重啟會清空記憶體房間。
 
-## 驗證
-
-`npm run test:3d`：檢查 3D 碰撞核心初始化、四個陀螺動力學、衝鋒冷卻、3D 座標與姿態。`npm test`：多人 WebSocket 回歸（若測試支援）。
-
-## 已知限制
-
-1. 真正的 3D 剛體物理，但各零件使用簡化的圓柱、球體組合碰撞器，未採真實玩具零件的精確質量分佈、空氣動力、精密接觸面與完整陀螺力學。
-2. 軌道「導回」屬原創遊戲化輔助力，非純被動物理軌道。
-3. 大量高速撞擊效果為人為放大，不是現實的彈性碰撞守恆模型。
-4. 不同手機硬體的 FPS、Safari WebGL 支援、所有配裝平衡與玩家手感仍需要實機驗收。
-5. 免費 Render 可能閒置休眠或限制可同時進行的物理房間。
-
-參考文件：Rapier https://rapier.rs/docs/user_guides/javascript/rigid_bodies/ ，Three.js https://threejs.org/manual/pages/installation.html
+參考：Rapier [Mass properties](https://rapier.rs/docs/user_guides/javascript/collider_mass_properties/)、[Forces and impulses](https://rapier.rs/docs/user_guides/javascript/rigid_body_forces_and_impulses/)、[Rigid bodies](https://rapier.rs/docs/user_guides/javascript/rigid_bodies/)、[Three.js](https://threejs.org/docs/)。

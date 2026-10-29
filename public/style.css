@@ -59,3 +59,15 @@
 #stage3d{position:absolute;inset:0;width:100%;height:100%;z-index:2;display:block;touch-action:none;outline:none;}
 .stage-frame{background:radial-gradient(circle at 45% 40%,#143047,#060a15 74%);}
 @media(max-width:720px){.stage-frame{aspect-ratio:1/1.05;}#stage3d{touch-action:none;}}
+
+/* V8 Launch & V9 Garage, touch-first */
+.garage-3d{display:block;width:100%;height:202px;background:radial-gradient(ellipse at 50% 65%,#203b54,#090e1c 75%);border:1px solid #587d96;border-radius:12px;margin:10px 0 6px;touch-action:pan-y}
+.garage-hint{color:#98bfd3;text-align:center;font-size:11px;margin-bottom:10px}
+.paint-row,.preset-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.paint-row input[type=color]{height:43px;width:80px;border:1px solid #56788e;background:#0b1724;border-radius:8px;padding:3px}
+.paint-row button,.preset-row button{padding:9px 10px!important;flex:1;white-space:nowrap}
+.preset-row select{flex:1;min-width:92px}.garage-presets{margin:12px 0;padding-top:10px;border-top:1px solid #3b5069}
+.launch-panel{border-top:1px solid #3b5069;padding-top:13px;margin-top:14px}
+.launch-panel input[type=range]{display:block;width:100%;accent-color:#ffad60;min-height:30px;margin:5px 0 12px}
+.launch-panel output{float:right;color:#ffe0a9;font-weight:800}
+.launch-hint{font-size:11px;line-height:1.5;color:#a1bacd;padding:9px;margin-top:10px;border-left:3px solid #e3aa66;background:#0a1826}
+@media(max-width:720px){.garage-3d{height:188px}.paint-row button,.preset-row button{min-height:44px}}

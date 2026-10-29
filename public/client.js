@@ -1,9 +1,9 @@
 'use strict';
 (() => {
 const $ = id => document.getElementById(id);
-const els = Object.fromEntries(['roster','profile','topType','bigTop','topName','topSkill','topStats','statTotal','typeFilters','netDot','netState','btnSound','soundText','bladeSelect','ratchetSelect','bitSelect','buildInfo','stage','stageFrame','stageTitle','gameTimer','roundState','fightHud','centerOverlay','overlayPlay','impactBanner','eventToast','playerName','roomInput','btnCreate','btnJoin','roomMessage','lobbyHeading','lobbyStatus','roomCode','btnCopy','btnShare','participants','arenaSelect','arenaDescription','botCount','btnStart','btnAgain','btnLeave','scoreboard','combatLog','touchTarget','touchBurst','touchGuard'].map(x=>[x,$(x)]));
+const els = Object.fromEntries(['roster','profile','topType','bigTop','topName','topSkill','topStats','statTotal','typeFilters','netDot','netState','btnSound','soundText','bladeSelect','ratchetSelect','bitSelect','buildInfo','garage3d','paintSelect','paintReset','presetSelect','presetSave','presetLoad','launchPower','launchAngle','launchLane','launchPowerValue','launchAngleValue','stage','stageFrame','stageTitle','gameTimer','roundState','fightHud','centerOverlay','overlayPlay','impactBanner','eventToast','playerName','roomInput','btnCreate','btnJoin','roomMessage','lobbyHeading','lobbyStatus','roomCode','btnCopy','btnShare','participants','arenaSelect','arenaDescription','botCount','btnStart','btnAgain','btnLeave','scoreboard','combatLog','touchTarget','touchBurst','touchGuard'].map(x=>[x,$(x)]));
 const ctx=els.stage.getContext('2d',{alpha:false});
-let ws,ownId=null,room=null,tops=[],arenas=[],parts={ratchets:[],bits:[]},selected='phoenix',build={ratchet:'wide7',bit:'taper'},filter='全部',latest=null,vis={},particles=[],shockwaves=[],trails={},logEntries=[],lastEvent='',status='offline',audioOn=false,audioCtx=null,beatTimer=null,beatStep=0,soundCooldown=0;
+let ws,ownId=null,room=null,tops=[],arenas=[],parts={ratchets:[],bits:[]},selected='phoenix',build={ratchet:'wide7',bit:'taper',paint:null},launch={power:85,angle:0,lane:0},filter='全部',latest=null,vis={},particles=[],shockwaves=[],trails={},logEntries=[],lastEvent='',status='offline',audioOn=false,audioCtx=null,beatTimer=null,beatStep=0,soundCooldown=0;
 let playTime=0,flash=0,shake=0,bannerTimer=null,toastTimer=null,gameOverShown=false;
 const storageKey='spinbreak-session-v2';
 let reconnectTimer=null,everConnected=false,waitForResume=false,lastServerSeen=Date.now();
@@ -11,9 +11,9 @@ const queryRoom=(new URLSearchParams(location.search).get('room')||'').slice(0,5
 const saveSession=(token,code)=>{try{sessionStorage.setItem(storageKey,JSON.stringify({token,code}));}catch{}};
 const readSession=()=>{try{return JSON.parse(sessionStorage.getItem(storageKey)||'null');}catch{return null;}};
 const clearSession=()=>{try{sessionStorage.removeItem(storageKey);}catch{}};
-try{const previousName=localStorage.getItem('spinbreak-player-name');if(previousName)els.playerName.value=previousName;const b=JSON.parse(localStorage.getItem('spinbreak-build-v4')||'null');if(b?.top)selected=b.top;if(b?.ratchet)build.ratchet=b.ratchet;if(b?.bit)build.bit=b.bit;}catch{}
+try{const previousName=localStorage.getItem('spinbreak-player-name');if(previousName)els.playerName.value=previousName;const b=JSON.parse(localStorage.getItem('spinbreak-build-v4')||'null');if(b?.top)selected=b.top;if(b?.ratchet)build.ratchet=b.ratchet;if(b?.bit)build.bit=b.bit;if(/^#[0-9a-f]{6}$/i.test(b?.paint||''))build.paint=b.paint;const l=JSON.parse(localStorage.getItem('spinbreak-launch-v9')||'null');if(l)launch={power:Math.max(55,Math.min(100,+l.power||85)),angle:Math.max(-40,Math.min(40,+l.angle||0)),lane:[-1,0,1].includes(+l.lane)?+l.lane:0};}catch{}
 const input={charge:false,burst:false};let targetId=null;
-window.SPINBREAK_3D_BRIDGE={getState:()=>({latest,room,tops,parts,selected,ownId,targetId}),setTarget:id=>{if(latest?.fighters?.some(p=>p.id===id&&p.alive&&id!==ownId)){targetId=id;notify('鎖定 '+latest.fighters.find(p=>p.id===id).name);updateChargeUI();}}};
+window.SPINBREAK_3D_BRIDGE={getState:()=>({latest,room,tops,parts,selected,build,launch,ownId,targetId}),setTarget:id=>{if(latest?.fighters?.some(p=>p.id===id&&p.alive&&id!==ownId)){targetId=id;notify('鎖定 '+latest.fighters.find(p=>p.id===id).name);updateChargeUI();}}};
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const hypot=(x,y)=>Math.hypot(x,y);
 const escapeHTML = s => String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -45,7 +45,7 @@ function netUI(){els.netState.textContent=({online:'伺服器已連線',offline:
 function onMessage(m){switch(m.t){
  case 'hello':ownId=m.id;tops=m.tops;arenas=m.arenas;parts=m.parts||parts;if(!tops.some(t=>t.id===selected))selected='phoenix';renderBuildOptions();renderRoster();renderProfile();renderArenaOptions();{const old=readSession();if(old?.token&&(!queryRoom||old.code===queryRoom)){waitForResume=true;send({t:'resume',token:old.token});}else{waitForResume=false;inviteOverlay();}}return;
  case 'resume_failed':waitForResume=false;clearSession();room=null;latest=null;renderLobby();if(queryRoom)inviteOverlay();else showOverlay('準備進入戰場','點擊建立房間，即可與 AI 練習或邀請朋友','立即開始對戰',()=>els.btnCreate.click());return;
- case 'joined':ownId=m.id;room=m.room;waitForResume=false;{const mine=room.players.find(p=>p.id===ownId);if(mine){selected=mine.top;build=mine.build||build;renderBuildOptions();renderRoster();renderProfile();}}if(m.token)saveSession(m.token,room.code);if(!m.resumed){latest=null;vis={};trails={};particles=[];logEntries=[];gameOverShown=false;targetId=null;}renderLobby();
+ case 'joined':ownId=m.id;room=m.room;waitForResume=false;{const mine=room.players.find(p=>p.id===ownId);if(mine){selected=mine.top;build=mine.build||build;launch=mine.launch||launch;syncGarageControls();renderBuildOptions();renderRoster();renderProfile();}}if(m.token)saveSession(m.token,room.code);if(!m.resumed){latest=null;vis={};trails={};particles=[];logEntries=[];gameOverShown=false;targetId=null;}renderLobby();
  if(room.status==='lobby'){showOverlay(m.resumed?'歡迎回到競技場！':'集結！準備開戰','分享邀請連結給朋友，所有玩家選好陀螺後由房主開戰',room.host===ownId?'開始戰鬥':'等待房主開始',()=>room?.host===ownId?send({t:'start'}):notify('等待房主開始戰鬥'));}
  else if(room.status==='playing')hideOverlay();
  showMsg((m.resumed?'已恢復連線：':'已進入房間：')+room.code,'success');return;
@@ -58,7 +58,7 @@ function onMessage(m){switch(m.t){
 }}
 function formatTime(secs){secs=Math.ceil(Math.max(0,secs));return `${String(Math.floor(secs/60)).padStart(2,'0')}:${String(secs%60).padStart(2,'0')}`;}
 function topMarkup(t){return `<div class="top-disc" style="--base:${t.color};--highlight:${t.accent};--glow:${t.color}"><div class="disc-shadow"></div><div class="disc-body"></div></div>`;}
-function renderRoster(){els.roster.innerHTML=tops.filter(t=>filter==='全部'||t.type===filter).map(t=>`<button class="top-card ${t.id===selected?'active':''}" data-top="${t.id}" title="${t.name} · ${t.skill}"><span class="card-type">${t.type}型</span>${topMarkup(t)}<div class="card-name">${t.name}</div><div class="card-detail">${t.skill}</div></button>`).join('');for(const card of els.roster.querySelectorAll('[data-top]'))card.addEventListener('click',()=>{if(room?.status==='playing'){notify('對戰中無法更換陀螺');return;}selected=card.dataset.top;els.bladeSelect.value=selected;renderRoster();renderProfile();saveBuild();if(room)send({t:'set',top:selected,build,name:els.playerName.value});});}
+function renderRoster(){els.roster.innerHTML=tops.filter(t=>filter==='全部'||t.type===filter).map(t=>`<button class="top-card ${t.id===selected?'active':''}" data-top="${t.id}" title="${t.name} · ${t.skill}"><span class="card-type">${t.type}型</span>${topMarkup(t)}<div class="card-name">${t.name}</div><div class="card-detail">${t.skill}</div></button>`).join('');for(const card of els.roster.querySelectorAll('[data-top]'))card.addEventListener('click',()=>{if(room?.status==='playing'){notify('對戰中無法更換陀螺');return;}selected=card.dataset.top;els.bladeSelect.value=selected;syncGarageControls();renderRoster();renderProfile();saveBuild();if(room)send({t:'set',top:selected,build,launch,name:els.playerName.value});});}
 function saveBuild(){try{localStorage.setItem('spinbreak-build-v4',JSON.stringify({top:selected,...build}));}catch{}}
 function partName(group,id){return parts[group].find(p=>p.id===id)?.name||id;}
 function partCode(group,id){return parts[group].find(p=>p.id===id)?.code||id;}
@@ -67,19 +67,41 @@ function renderBuildOptions(){
  for(const [el,group] of [[els.ratchetSelect,'ratchets'],[els.bitSelect,'bits']])el.innerHTML=parts[group].map(p=>`<option value="${p.id}">${p.code} · ${p.name}</option>`).join('');
  if(!parts.ratchets.some(p=>p.id===build.ratchet))build.ratchet='wide7';
  if(!parts.bits.some(p=>p.id===build.bit))build.bit='taper';
- els.bladeSelect.value=selected;els.ratchetSelect.value=build.ratchet;els.bitSelect.value=build.bit;updateBuildInfo();
+ els.bladeSelect.value=selected;els.ratchetSelect.value=build.ratchet;els.bitSelect.value=build.bit;syncGarageControls();updateBuildInfo();
 }
 function updateBuildInfo(){
  const r=parts.ratchets.find(p=>p.id===build.ratchet),b=parts.bits.find(p=>p.id===build.bit);
- els.buildInfo.innerHTML=`<strong>${escapeHTML(getTop(selected)?.name||'')} · ${escapeHTML(r?.code||'')} / ${escapeHTML(b?.code||'')}</strong><span>${escapeHTML(r?.desc||'')}<br>${escapeHTML(b?.desc||'')}</span>`;
+ els.buildInfo.innerHTML=`<strong>${escapeHTML(getTop(selected)?.name||'')} · ${escapeHTML(r?.code||'')} / ${escapeHTML(b?.code||'')}</strong><span>${escapeHTML(r?.desc||'')}<br>${escapeHTML(b?.desc||'')}<br>發射 ${launch.power}%／${launch.angle}°，${launch.lane===0?'中央':launch.lane<0?'偏左':'偏右'}路線</span>`;window.dispatchEvent(new Event('spinbreak-garage-change'));
 }
 for(const id of ['bladeSelect','ratchetSelect','bitSelect'])els[id].addEventListener('change',()=>{
  if(room?.status==='playing'){notify('戰鬥中無法修改零件');renderBuildOptions();return;}
- selected=els.bladeSelect.value;build={ratchet:els.ratchetSelect.value,bit:els.bitSelect.value};saveBuild();updateBuildInfo();renderRoster();renderProfile();
- if(room)send({t:'set',top:selected,build,name:els.playerName.value});
+ selected=els.bladeSelect.value;build={ratchet:els.ratchetSelect.value,bit:els.bitSelect.value,paint:build.paint};saveBuild();updateBuildInfo();renderRoster();renderProfile();
+ if(room)send({t:'set',top:selected,build,launch,name:els.playerName.value});
 });
 function renderProfile(){const t=getTop(selected);if(!t)return;updateBuildInfo();els.topType.textContent=t.type+'型';els.bigTop.innerHTML=topMarkup(t);els.topName.textContent=t.name;els.topSkill.textContent='✦ 必殺技 · '+t.skill;els.topStats.innerHTML=[['攻擊','a'],['防禦','d'],['速度','s'],['續航','e']].map(([name,k])=>`<div class="stat"><span>${name}</span><div class="stat-track"><div class="stat-fill" style="width:${t[k]*12.5}%"></div></div><strong>${t[k]}</strong></div>`).join('');els.statTotal.textContent=`刀刃 ${t.a+t.d+t.s+t.e} 點 · ${partCode('ratchets',build.ratchet)} / ${partCode('bits',build.bit)}`;
 }
+// V8 / V9 launch configuration + offline garage presets.
+function syncGarageControls(){
+ if(!els.launchPower)return;
+ els.launchPower.value=String(launch.power);els.launchAngle.value=String(launch.angle);els.launchLane.value=String(launch.lane);
+ els.launchPowerValue.textContent=launch.power+'%';els.launchAngleValue.textContent=launch.angle+'°';
+ els.paintSelect.value=build.paint||getTop(selected)?.color||'#ff613f';
+}
+function applyGarage(){saveBuild();try{localStorage.setItem('spinbreak-launch-v9',JSON.stringify(launch));}catch{}
+ syncGarageControls();updateBuildInfo();renderRoster();renderProfile();
+ if(room?.status==='lobby')send({t:'set',top:selected,build,launch,name:els.playerName.value});
+}
+els.paintSelect.addEventListener('input',()=>{if(room?.status==='playing')return;build.paint=els.paintSelect.value;applyGarage();});
+els.paintReset.addEventListener('click',()=>{if(room?.status==='playing')return;build.paint=null;applyGarage();});
+for(const id of ['launchPower','launchAngle','launchLane'])els[id].addEventListener('input',()=>{
+ if(room?.status==='playing'){syncGarageControls();return;}
+ launch={power:+els.launchPower.value,angle:+els.launchAngle.value,lane:+els.launchLane.value};applyGarage();
+});
+const presetStorage='spinbreak-presets-v9';
+function readPresets(){try{return JSON.parse(localStorage.getItem(presetStorage)||'{}')||{};}catch{return {};}}
+els.presetSave.addEventListener('click',()=>{const p=readPresets();p[els.presetSelect.value]={top:selected,build:{...build},launch:{...launch}};try{localStorage.setItem(presetStorage,JSON.stringify(p));notify('已儲存配裝 '+(+els.presetSelect.value+1));}catch{notify('瀏覽器無法儲存配裝');}});
+els.presetLoad.addEventListener('click',()=>{if(room?.status==='playing'){notify('請在下一回合換裝');return;}const p=readPresets()[els.presetSelect.value];if(!p){notify('這個欄位還沒有配裝');return;}if(tops.some(t=>t.id===p.top))selected=p.top;build={ratchet:p.build?.ratchet||'wide7',bit:p.build?.bit||'taper',paint:p.build?.paint||null};launch={power:+p.launch?.power||85,angle:+p.launch?.angle||0,lane:+p.launch?.lane||0};renderBuildOptions();applyGarage();notify('已套用配裝 '+(+els.presetSelect.value+1));});
+syncGarageControls();
 els.typeFilters.addEventListener('click',e=>{const b=e.target.closest('[data-filter]');if(!b)return;filter=b.dataset.filter;for(const x of els.typeFilters.querySelectorAll('[data-filter]'))x.classList.toggle('active',x===b);renderRoster();});
 function renderArenaOptions(){els.arenaSelect.innerHTML=arenas.map(a=>`<option value="${a.id}">${a.name}</option>`).join('');}
 function showMsg(s,type=''){els.roomMessage.textContent=s;els.roomMessage.className='room-message '+type;}
@@ -87,11 +109,11 @@ function renderLobby(){els.stageFrame.classList.toggle('playing',room?.status===
  els.participants.innerHTML=inRoom?room.players.map((p,i)=>{const t=getTop(p.top);return `<div class="participant"><span class="p-number">0${i+1}</span><div class="p-detail"><strong>${escapeHTML(p.name)}${p.id===ownId?' (你)':''}</strong><small>${escapeHTML(t?.name||'未知陀螺')} · ${escapeHTML(partCode('ratchets',p.build?.ratchet))} / ${escapeHTML(partCode('bits',p.build?.bit))}${p.id===room.host?' · 房主':''}</small></div><span class="p-tag ${p.connected===false?'disconnected':''}">${p.connected===false?'重連中':'READY'}</span></div>`;}).join('')+Array.from({length:room.bots},(_,i)=>`<div class="participant"><span class="p-number">AI</span><div class="p-detail"><strong>AI 對手 #${i+1}</strong><small>自動選角 · 智慧對戰</small></div><span class="p-tag">CPU</span></div>`).join(''):'<div class="placeholder-person">◎ 建立房間，準備開戰</div>';
  if(room?.status==='lobby'){els.roundState.textContent='STANDBY';els.gameTimer.textContent='01:15';}if(room?.status==='results')els.roundState.textContent='FINISHED';
 }
-els.btnCreate.addEventListener('click',()=>{if(status!=='online'){showMsg('伺服器尚未連線','error');return;}try{localStorage.setItem('spinbreak-player-name',els.playerName.value);}catch{}send({t:'create',name:els.playerName.value,top:selected,build});});
-els.btnJoin.addEventListener('click',()=>{const code=els.roomInput.value.toUpperCase().trim();if(code.length!==5){showMsg('請輸入五位房間代碼','error');return;}try{localStorage.setItem('spinbreak-player-name',els.playerName.value);}catch{}send({t:'join',code,name:els.playerName.value,top:selected,build});});
+els.btnCreate.addEventListener('click',()=>{if(status!=='online'){showMsg('伺服器尚未連線','error');return;}try{localStorage.setItem('spinbreak-player-name',els.playerName.value);}catch{}send({t:'create',name:els.playerName.value,top:selected,build,launch});});
+els.btnJoin.addEventListener('click',()=>{const code=els.roomInput.value.toUpperCase().trim();if(code.length!==5){showMsg('請輸入五位房間代碼','error');return;}try{localStorage.setItem('spinbreak-player-name',els.playerName.value);}catch{}send({t:'join',code,name:els.playerName.value,top:selected,build,launch});});
 els.roomInput.addEventListener('keydown',e=>{if(e.key==='Enter')els.btnJoin.click();});
 els.btnStart.addEventListener('click',()=>{if(!audioOn){initAudio();audioOn=true;els.soundText.textContent='音效開';beat();beatTimer=setInterval(beat,117);}send({t:'start'});});els.btnAgain.addEventListener('click',()=>{send({t:'again'});gameOverShown=false;showOverlay('下一場，突破極限','重新選擇戰鬥陀螺與競技場，迎接下一場決戰','準備再戰',()=>send({t:'start'}));});els.btnLeave.addEventListener('click',()=>{send({t:'leave'});clearSession();room=null;latest=null;vis={};trails={};renderLobby();showOverlay('準備好燃燒鬥志了嗎？','建立房間即可與 AI 對戰，或邀請朋友加入 2～4 人競技','立即開始對戰',()=>els.btnCreate.click());});
-els.arenaSelect.addEventListener('change',()=>send({t:'arena',id:els.arenaSelect.value}));els.botCount.addEventListener('change',()=>send({t:'bots',count:+els.botCount.value}));els.playerName.addEventListener('change',()=>{if(room?.status==='lobby')send({t:'set',top:selected,build,name:els.playerName.value});});
+els.arenaSelect.addEventListener('change',()=>send({t:'arena',id:els.arenaSelect.value}));els.botCount.addEventListener('change',()=>send({t:'bots',count:+els.botCount.value}));els.playerName.addEventListener('change',()=>{if(room?.status==='lobby')send({t:'set',top:selected,build,launch,name:els.playerName.value});});
 function inviteLink(){const url=new URL(location.href);url.search='';url.hash='';url.searchParams.set('room',room.code);return url.toString();}
 async function copyInvite(){if(!room)return;const link=inviteLink();try{await navigator.clipboard.writeText(link);notify('邀請連結已複製，可傳給朋友');}catch{window.prompt('長按並複製這個邀請網址：',link);}}
 els.btnCopy.addEventListener('click',copyInvite);

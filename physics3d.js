@@ -53,26 +53,55 @@ function makeEngine(tops,parts,callbacks){
   const membersCount=members.length;
   return members.map((p,i)=>{
    const a=TAU*i/membersCount-Math.PI/2+.48;
-   const x=2.20*Math.cos(a),z=2.20*Math.sin(a),t=topBy[p.top];
-   const st=stats(p),rad=.48,spinRate=82+st.stamina*3;
+   const launch=p.launch||{angle:0,power:85,lane:0};
+   const lane=clamp(launch.lane||0,-1,1),angle=clamp(launch.angle||0,-40,40)*Math.PI/180;
+   const theta=a+lane*.22,launchSpeed=(2.0+clamp(launch.power||85,55,100)*.032)*stats(p).drive;
+   const x=(2.20+Math.abs(lane)*.35)*Math.cos(theta),z=(2.20+Math.abs(lane)*.35)*Math.sin(theta),t=topBy[p.top];
+   const st=stats(p),rad=.48,spinRate=(77+st.stamina*3)*(0.79+clamp(launch.power||85,55,100)*.0025);
+   const direct=theta+Math.PI/2+angle;
    // Top-shaped compound collision body: bottom tip + mid ratchet + large attack rim.
    const lean=.025+(i%3)*.01;
    const body=r.physics.world.createRigidBody(R.RigidBodyDesc.dynamic()
      .setTranslation(x,.39,z).setRotation({x:Math.cos(a)*Math.sin(lean/2),y:0,z:Math.sin(a)*Math.sin(lean/2),w:Math.cos(lean/2)})
-     .setLinvel(-Math.sin(a)*3.1,0,Math.cos(a)*3.1)
+     .setLinvel(Math.cos(direct)*launchSpeed,.18,Math.sin(direct)*launchSpeed)
      .setAngvel(V(.6,spinRate,.6))
      .setLinearDamping(.18).setAngularDamping(.055).setCcdEnabled(true).setCanSleep(false));
    const events=R.ActiveEvents.COLLISION_EVENTS|R.ActiveEvents.CONTACT_FORCE_EVENTS;
-   const rim=r.physics.world.createCollider(R.ColliderDesc.cylinder(.14,rad)
-     .setTranslation(0,.04,0).setDensity(st.mass*7.2).setFriction(.22*st.grip)
-     .setRestitution(.98).setActiveEvents(events).setContactForceEventThreshold(.2),body);
-   const ratchet=r.physics.world.createCollider(R.ColliderDesc.cylinder(.085,.30)
-     .setTranslation(0,-.105,0).setDensity(st.mass*1.5).setFriction(.26).setRestitution(.87),body);
-   const tip=r.physics.world.createCollider(R.ColliderDesc.ball(.125)
-     .setTranslation(0,-.25,0).setDensity(st.mass*.3).setFriction(.40*st.grip).setRestitution(.18),body);
-   for(const c of [rim,ratchet,tip])r.physics.byCollider.set(c.handle,p.id);
+   // Real collision silhouette: a central hub plus independently positioned, rotating
+   // lobe colliders. Density creates a different inertia tensor for each blade.
+   const shape=t.blade||{lobes:5,reach:.39,tip:.13};
+   const rim=r.physics.world.createCollider(R.ColliderDesc.cylinder(.125,.31)
+     .setTranslation(0,.05,0).setDensity(st.mass*4.7).setFriction(.23*st.grip)
+     .setRestitution(.89).setActiveEvents(events).setContactForceEventThreshold(.2),body);
+   const contacts=[rim];
+   for(let j=0;j<shape.lobes;j++){
+     const az=TAU*j/shape.lobes + (shape.shape==='swept'?.10:0);
+     const rr=shape.reach-(j%2&&shape.shape==='hammer'?.04:0);
+     const cc=r.physics.world.createCollider(R.ColliderDesc.ball(shape.tip)
+       .setTranslation(Math.cos(az)*rr,.05+(shape.shape==='axe'?.07:0),Math.sin(az)*rr)
+       .setDensity(st.mass*(shape.shape==='shield'?1.30:1.65)/shape.lobes*4)
+       .setFriction(.19*st.grip).setRestitution(.95)
+       .setActiveEvents(events).setContactForceEventThreshold(.2),body);
+     contacts.push(cc);
+   }
+   // Ratchet teeth change the compound body's mass distribution and lower striking surface.
+   const ratchetCount=clamp(getParts(p).rat.gear||5,2,9);
+   const ratchet=r.physics.world.createCollider(R.ColliderDesc.cylinder(.065,.235)
+     .setTranslation(0,-.115,0).setDensity(st.mass*1.35).setFriction(.26).setRestitution(.8),body);
+   contacts.push(ratchet);
+   for(let j=0;j<ratchetCount;j++){
+     const az=TAU*j/ratchetCount;
+     contacts.push(r.physics.world.createCollider(R.ColliderDesc.ball(.055)
+       .setTranslation(Math.cos(az)*.235,-.115,Math.sin(az)*.235)
+       .setDensity(st.mass*.42).setFriction(.32).setRestitution(.83),body));
+   }
+   const tipRadius=getParts(p).bit.id==='ball'?.15:getParts(p).bit.id==='needle'?.085:getParts(p).bit.id==='rubber'?.145:.115;
+   const tip=r.physics.world.createCollider(R.ColliderDesc.ball(tipRadius)
+     .setTranslation(0,-.25,0).setDensity(st.mass*.7).setFriction(.40*st.grip).setRestitution(.18),body);
+   contacts.push(tip);
+   for(const c of contacts)r.physics.byCollider.set(c.handle,p.id);
    return {...p,x:x*U,y:z*U,h:body.translation().y*U,vx:0,vy:0,q:[0,0,0,1],body,
-      initialSpin:spinRate,spin:100,spinEnergy:100,wobble:0,alive:true,koReason:'',cool:0,chargeCd:0,
+      initialSpin:spinRate,launchStrength:launchSpeed,spin:100,spinEnergy:100,wobble:0,alive:true,koReason:'',cool:0,chargeCd:0,
       chargeUntil:0,boostUntil:0,fortressUntil:0,phaseUntil:0,bladeUntil:0,slowUntil:0,stunUntil:0,
       impact:0,skillCount:0,railTimer:0,railCooldown:0,railSign:1,railAngle:0,bot:!!p.bot,
       input:{targetId:null},aiTimer:0,orbitSign:i%2?-1:1,orbitPhase:i*2.2,
@@ -144,9 +173,9 @@ function makeEngine(tops,parts,callbacks){
    // Motorized launch: retain the physical spin axis while gradually losing launch energy.
    // The world still resolves 3D tilt, inertia, contact and impacts; this only represents
    // a game-like, low-loss bearing instead of the exaggerated drag of a sphere tip.
-   p.spinEnergy=clamp(p.spinEnergy-TICK*(1.05+(p.bladeUntil>r.age?.15:0))*st.drain,0,100);
+   p.spinEnergy=clamp(p.spinEnergy-TICK*(.85+(p.bladeUntil>r.age?.15:0))*st.drain,0,100);
    const desired=p.initialSpin*(p.spinEnergy/100);
-   const correction=clamp((desired-spinSpeed)*.28,-12,12);
+   const correction=clamp((desired-spinSpeed)*.20,-9,9);
    b.applyTorqueImpulse(V(axis.x*correction*.045,axis.y*correction*.045,axis.z*correction*.045),true);
    const lateral=length(v.x,v.z);const radius=length(pos.x,pos.z);
    if(p.spinEnergy>10){
@@ -189,9 +218,16 @@ function makeEngine(tops,parts,callbacks){
    if(other){
      // Arcade amplification on top of *real* rigid body contact impulse.
      const charged=(a.chargeUntil>r.age||b.chargeUntil>r.age);
-     const extra=clamp(rel*.30+(charged?2.2:0)+impulse*.00006,1.0,5.3);
+     const bladeFactor=clamp(((topBy[a.top].blade?.reach||.39)+(topBy[b.top].blade?.reach||.39))/.78,.8,1.25);
+     const extra=clamp((rel*.32+(charged?2.4:0)+impulse*.000055)*bladeFactor,1.1,6.2);
      burst(r,a,b,extra,clamp(rel*.13+(charged?1.0:0),.12,2.6));
      burst(r,b,a,extra,clamp(rel*.13+(charged?1.0:0),.12,2.6));
+     // Off-axis opposing impulses add visible tipping/gyro reaction (not health damage).
+     const sa=topBy[a.top].blade,sb=topBy[b.top].blade;
+     const tangent=norm(b.body.translation().x-a.body.translation().x,b.body.translation().z-a.body.translation().z);
+     const torque=clamp(rel*.065,.10,.70);
+     a.body.applyTorqueImpulse(V(tangent[1]*torque*a.body.mass(),0,-tangent[0]*torque*a.body.mass()),true);
+     b.body.applyTorqueImpulse(V(-tangent[1]*torque*b.body.mass(),0,tangent[0]*torque*b.body.mass()),true);
      a.lastHit=b.name;b.lastHit=a.name;a.lastHitAt=b.lastHitAt=r.age;
      const loss=clamp(rel*.20+(charged?3.0:0)+impulse*.0002,.6,9.0);
      a.spinEnergy=Math.max(0,a.spinEnergy-loss*stats(a).drain);
@@ -230,7 +266,7 @@ function makeEngine(tops,parts,callbacks){
     spin:Math.round(p.spin),wobble:Math.round(p.wobble),alive:p.alive,reason:p.koReason||'',rail:p.railTimer>0,
     cool:+p.cool.toFixed(1),chargeCd:+p.chargeCd.toFixed(1),charging:p.chargeUntil>r.age,shield:p.fortressUntil>r.age,
     phase:p.phaseUntil>r.age,boost:p.boostUntil>r.age,blade:p.bladeUntil>r.age,impact:p.impact>0,skillCount:p.skillCount,
-    rpm:Math.round(p.spin*p.initialSpin/100*60/(Math.PI*2))};})};
+    rpm:Math.round((p.physicalSpin||p.spin)*p.initialSpin/100*60/(Math.PI*2)),launch:p.launch};})};
  }
  function free(r){if(r.physics?.world)r.physics.world.free();r.physics=null;}
  return {create,tick,charge,skill,snapshot,free,stats};
