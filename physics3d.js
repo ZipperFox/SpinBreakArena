@@ -29,23 +29,27 @@ function makeEngine(tops,parts,callbacks){
   world.timestep=TICK;
   // Solver stabilization and accurate fast impact collision.
   world.numSolverIterations=10;
-  r.physics={world,queue:new R.EventQueue(true),byCollider:new Map(),contactTimes:new Map(),rails:[],pillars:PLACES[r.arena]||PLACES.colosseum};
+  r.physics={world,queue:new R.EventQueue(true),byCollider:new Map(),guardColliders:new Set(),railColliders:new Set(),contactTimes:new Map(),rails:[],pillars:PLACES[r.arena]||PLACES.colosseum};
   const floor=R.ColliderDesc.cuboid(8.15,.17,8.15);
   fixed(r,floor,0,-.19,0,.08,.65);
-  // Cylindrical real guard bumper pieces. Four openings: 2 elimination pockets, 2 return rails.
+  // Tall overlapping upright cylinders, NOT low spheres. A rounded horizontal row
+  // acts like a ramp and can vault a fast spinning top over the barrier.
+  // The two N/S pockets remain genuine ring-out openings; E/W are return-lane gates.
   for(let i=0;i<104;i++){
    const a=(i+.5)*TAU/104;
-   const distance=Math.min(Math.abs(Math.atan2(Math.sin(a),Math.cos(a-Math.PI/2))),Math.abs(Math.atan2(Math.sin(a+Math.PI/2),Math.cos(a+Math.PI/2))));
    const danger=Math.abs(Math.abs(Math.sin(a))-1)<.043;
    const portal=Math.abs(Math.sin(a))<.19;
    if(danger||portal)continue;
-   fixed(r,R.ColliderDesc.ball(.235),5.75*Math.cos(a),.42,5.75*Math.sin(a),.91,.3);
+   const guard=fixed(r,R.ColliderDesc.cylinder(1.0,.225),5.75*Math.cos(a),.82,5.75*Math.sin(a),.58,.10);
+   r.physics.guardColliders.add(guard.handle);
   }
-  for(const [x,z,rad] of r.physics.pillars){fixed(r,R.ColliderDesc.cylinder(.35,rad),x,.38,z,.99,.27);}
-  // Outer return lanes: tangible outer bumpers with a guided accelerator impulse.
-  for(const side of [-1,1])for(let i=0;i<16;i++){
-   const a=(side===1?0:Math.PI)+(i-7.5)*.05;
-   fixed(r,R.ColliderDesc.ball(.19),6.7*Math.cos(a),.30,6.7*Math.sin(a),.98,.12);
+  for(const [x,z,rad] of r.physics.pillars){fixed(r,R.ColliderDesc.cylinder(.35,rad),x,.38,z,.86,.27);}
+  // The return lanes also have genuinely tall outer walls so fast tops cannot
+  // jump their low spherical bumpers or escape the outer lane at speed.
+  for(const side of [-1,1])for(let i=0;i<22;i++){
+   const a=(side===1?0:Math.PI)+(i-10.5)*.043;
+   const wall=fixed(r,R.ColliderDesc.cylinder(.88,.245),6.84*Math.cos(a),.75,6.84*Math.sin(a),.50,.08);
+   r.physics.railColliders.add(wall.handle);
   }
  }
  function create(r,members){
@@ -186,10 +190,15 @@ function makeEngine(tops,parts,callbacks){
       b.applyImpulse(V(-nz*p.orbitSign*torque,0,nx*p.orbitSign*torque),true);
     }
    }
-   if(p.railTimer>0){ // track returns the moving rigid body through impulses, not teleporting.
-     const sign=pos.x>=0?1:-1;const [nx,nz]=norm(pos.x,pos.z);
-     const force=V(-nx*3.8-b.linvel().x*.22,1.25, -nz*3.8-b.linvel().z*.22);
-     b.applyImpulse(V(force.x*b.mass()*TICK,force.y*b.mass()*TICK,force.z*b.mass()*TICK),true);
+   if(p.railTimer>0){ // real guided impulses; no teleport and no instant elimination.
+     const [nx,nz]=norm(pos.x,pos.z),vRad=v.x*nx+v.z*nz;
+     const tx=-nz*p.railSign,tz=nx*p.railSign;
+     const vTan=v.x*tx+v.z*tz;
+     // Strong enough to turn back even a maximum-speed charge within the lane.
+     const desiredRad=radius>5.8?-6.2:-2.4;
+     const radialKick=clamp((desiredRad-vRad)*.19,-4,1.4);
+     const tangentialKick=clamp((5.4-vTan)*.065,-.7,.7);
+     b.applyImpulse(V((nx*radialKick+tx*tangentialKick)*b.mass(),0,(nz*radialKick+tz*tangentialKick)*b.mass()),true);
    }
    // Shallow bowl guidance near the perimeter: reduces accidental self-ring-outs.
    // It is intentionally weak; charged impacts can still overwhelm it.
@@ -238,6 +247,17 @@ function makeEngine(tops,parts,callbacks){
      callbacks.event(r,'hit',`${a.name} ⚡ ${b.name} · 3D 重擊！`,a.id,Math.round(rel*40),{x:(a.x+b.x)/2,y:(a.y+b.y)/2,critical:charged,force:Math.round(impulse)});
    }else{
      who.impact=.35;
+     const guard=phy.guardColliders.has(c.collider1())||phy.guardColliders.has(c.collider2());
+     const laneWall=phy.railColliders.has(c.collider1())||phy.railColliders.has(c.collider2());
+     if((guard||laneWall)&&r.age-(who.lastGuardAt??-99)>.11){
+       who.lastGuardAt=r.age;
+       const wp=who.body.translation(),wv=who.body.linvel(),rad=Math.max(.01,length(wp.x,wp.z));
+       const nx=wp.x/rad,nz=wp.z/rad,outward=wv.x*nx+wv.z*nz;
+       // Enforce an inward *wall rebound* only at a real guard contact.
+       // Never boost tops outward or add upward energy at a barrier.
+       if(outward>0.6)who.body.applyImpulse(V(-nx*(outward*1.55)*who.body.mass(),0,-nz*(outward*1.55)*who.body.mass()),true);
+       if(wv.y>1.65)who.body.setLinvel(V(wv.x,1.65,wv.z),true);
+     }
      if(rel>2.7)callbacks.event(r,'wall','3D 護欄強力反彈！',who.id,Math.round(rel*40),{x:who.x,y:who.y});
    }
   });
