@@ -27,7 +27,7 @@ async function run(){
    assert(rebounded,`ordinary wall never reversed velocity arena=${arena} angle=${a}`);
    engine.free(r);checks++;
   }
-  {const {r,p}=reset();p.body.setTranslation(vec(0,.39,5.08),true);p.body.setLinvel(vec(0,0,13),true);for(let i=0;i<38&&r.status==='playing';i++)engine.tick(r,1/30);
+  {const {r,p}=reset();p.body.setTranslation(vec(0,.39,5.08),true);p.body.setLinvel(vec(0,0,13),true);p.lastHitAt=.01;p.lastHitSpeed=13;for(let i=0;i<38&&r.status==='playing';i++)engine.tick(r,1/30);
    assert(!p.alive&&p.koReason==='擊出場外',`intentional pocket should KO in ${arena}: ${p.koReason||'alive'}`);
    engine.free(r);checks++;
   }

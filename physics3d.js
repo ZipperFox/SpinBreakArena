@@ -4,6 +4,14 @@
 const R = require('@dimforge/rapier3d-compat');
 let initialized = false;
 const U=40, RING=5.75, TICK=1/90, TAU=Math.PI*2;
+// V9.2: the lethal N/S gates are narrow, and a confirmed opponent impact is
+// required for a gate KO. This reduces unforced accidents without removing KOs.
+const EXIT_HALF_ANGLE=.185;
+const EXIT_CONFIRM_Z=6.38;
+const EXIT_IMPACT_WINDOW=1.6;
+const EXIT_MIN_HIT_SPEED=3.5;
+const EXIT_MIN_OUTWARD_SPEED=3.1;
+const gateImpact=(r,p)=>p.lastHitAt>0 && r.age-p.lastHitAt<=EXIT_IMPACT_WINDOW && p.lastHitSpeed>=EXIT_MIN_HIT_SPEED;
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const length=(x,z)=>Math.hypot(x,z);
 const norm=(x,z)=>{const v=Math.max(.0001,length(x,z));return [x/v,z/v]};
@@ -37,7 +45,7 @@ function makeEngine(tops,parts,callbacks){
   // The two N/S pockets remain genuine ring-out openings; E/W are return-lane gates.
   for(let i=0;i<104;i++){
    const a=(i+.5)*TAU/104;
-   const danger=Math.abs(Math.abs(Math.sin(a))-1)<.043;
+   const danger=Math.abs(Math.cos(a))<Math.sin(EXIT_HALF_ANGLE);
    const portal=Math.abs(Math.sin(a))<.19;
    if(danger||portal)continue;
    const guard=fixed(r,R.ColliderDesc.cylinder(1.68,.225),5.75*Math.cos(a),1.50,5.75*Math.sin(a),.58,.10);
@@ -109,7 +117,7 @@ function makeEngine(tops,parts,callbacks){
       chargeUntil:0,boostUntil:0,fortressUntil:0,phaseUntil:0,bladeUntil:0,slowUntil:0,stunUntil:0,
       impact:0,skillCount:0,railTimer:0,railCooldown:0,railSign:1,railAngle:0,bot:!!p.bot,
       input:{targetId:null},aiTimer:0,orbitSign:i%2?-1:1,orbitPhase:i*2.2,
-      lastHit:null,lastHitAt:0,lastImpactAt:-100,chargeCount:0,flightCount:0,score:0};
+      lastHit:null,lastHitAt:-100,lastHitSpeed:0,lastImpactAt:-100,chargeCount:0,flightCount:0,score:0};
   });
  }
  function sync(p){const pos=p.body.translation(),vel=p.body.linvel(),q=p.body.rotation(),w=p.body.angvel(),ax=quatAxis(q);
@@ -200,6 +208,16 @@ function makeEngine(tops,parts,callbacks){
      const tangentialKick=clamp((5.4-vTan)*.065,-.7,.7);
      b.applyImpulse(V((nx*radialKick+tx*tangentialKick)*b.mass(),0,(nz*radialKick+tz*tangentialKick)*b.mass()),true);
    }
+   // The mouth of each N/S gate has an arcade-style return lip. Passive orbiting,
+   // missed charges and gentle side bumps should bend back into the arena; a
+   // recent *strong opponent hit* still has a genuine free exit route.
+   if(Math.abs(pos.z)>4.75 && Math.abs(pos.x)<1.45 && !gateImpact(r,p)){
+      const sign=pos.z>=0?1:-1,outward=v.z*sign;
+      if(outward>0 && Math.abs(pos.z)>5.02){
+        const redirect=clamp((outward+2.4)*.165,0,2.6);
+        b.applyImpulse(V(0,0,-sign*redirect*b.mass()),true);
+      }
+   }
    // Shallow bowl guidance near the perimeter: reduces accidental self-ring-outs.
    // It is intentionally weak; charged impacts can still overwhelm it.
    if(radius>4.2&&p.chargeUntil<=r.age&&p.railTimer<=0){const pull=Math.min(.7,(radius-4.2)*.28);b.applyImpulse(V(-pos.x/radius*pull*TICK*b.mass(),0,-pos.z/radius*pull*TICK*b.mass()),true);}
@@ -240,7 +258,7 @@ function makeEngine(tops,parts,callbacks){
      const torque=clamp(rel*.065,.10,.70);
      a.body.applyTorqueImpulse(V(tangent[1]*torque*a.body.mass(),0,-tangent[0]*torque*a.body.mass()),true);
      b.body.applyTorqueImpulse(V(-tangent[1]*torque*b.body.mass(),0,tangent[0]*torque*b.body.mass()),true);
-     a.lastHit=b.name;b.lastHit=a.name;a.lastHitAt=b.lastHitAt=r.age;
+     a.lastHit=b.name;b.lastHit=a.name;a.lastHitAt=b.lastHitAt=r.age;a.lastHitSpeed=b.lastHitSpeed=rel;
      const loss=clamp(rel*.20+(charged?3.0:0)+impulse*.0002,.6,9.0);
      a.spinEnergy=Math.max(0,a.spinEnergy-loss*stats(a).drain);
      b.spinEnergy=Math.max(0,b.spinEnergy-loss*stats(b).drain);
@@ -267,7 +285,7 @@ function makeEngine(tops,parts,callbacks){
   // pockets and the E/W return lanes untouched. Center-field aerial KOs stay.
   for(const p of r.fighters){if(!p.alive)continue;
    const b=p.body,pos=b.translation(),dist=length(pos.x,pos.z),sine=dist>0?Math.abs(pos.z/dist):0;
-   const protectedWall=dist>4.35&&dist<6.55&&sine>=.20&&sine<=.978;
+   const protectedWall=dist>4.35&&dist<6.55&&sine>=.20&&sine<=Math.cos(EXIT_HALF_ANGLE);
    if(protectedWall){
       const vel=b.linvel();
       if(pos.y>.72&&vel.y>.55)b.setLinvel(V(vel.x,.55,vel.z),true);
@@ -281,9 +299,25 @@ function makeEngine(tops,parts,callbacks){
    if(p.railTimer>0)p.railTimer=Math.max(0,p.railTimer-TICK);
    p.railCooldown=Math.max(0,p.railCooldown-TICK);
    if(p.impact>0)p.impact=Math.max(0,p.impact-TICK);
-   // Open dangerous north/south pockets: knockout on momentum, rather than removing all walls.
-   const nowPos=p.body.translation(),v=p.body.linvel(),out=Math.hypot(nowPos.x,nowPos.z);
-   if(out>5.9&&Math.abs(nowPos.z)>4.5&&Math.abs(nowPos.x)<2.0&&length(v.x,v.z)>2.5){callbacks.ko(r,p,'擊出場外');}
+   // Only a genuinely strong opponent impact can finish via the N/S gates.
+   // The previous >5.9 radius test eliminated tops *inside* the exit mouth.
+   const nowPos=p.body.translation(),v=p.body.linvel(),sign=nowPos.z>=0?1:-1;
+   if(Math.abs(nowPos.z)>EXIT_CONFIRM_Z && Math.abs(nowPos.x)<1.25){
+     const outward=v.z*sign;
+     if(gateImpact(r,p)&&outward>EXIT_MIN_OUTWARD_SPEED){
+       callbacks.ko(r,p,'擊出場外');
+     }else if(!gateImpact(r,p)){
+       // Returning from a missed shot is a controlled impact, not teleportation.
+       // Keep the rigid body in the lane and reflect only excessive outward speed.
+       if(outward>0.0){
+         p.body.setLinvel(V(v.x*.85,Math.min(v.y,1.1),-sign*Math.max(3.2,outward*.46)),true);
+         if(r.age-(p.lastExitSaveAt??-100)>.8){
+           p.lastExitSaveAt=r.age;
+           callbacks.event(r,'rail',`${p.name} · 安全回場反彈！`,p.id,Math.round(outward*40),{x:p.x,y:p.y});
+         }
+       }
+     }
+   }
   }
  }
  function tick(r,dt){if(r.status!=='playing')return;r.age+=dt;

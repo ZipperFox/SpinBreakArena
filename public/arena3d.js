@@ -38,15 +38,15 @@ function createStage(name){battleground.clear();stageName=name;
  const dummy=new THREE.Object3D();
  for(let i=0;i<104;i++){
   const a=(i+.5)*Math.PI*2/104;
-  const danger=Math.abs(Math.abs(Math.sin(a))-1)<.043;
+  const danger=Math.abs(Math.cos(a))<Math.sin(.185);
   const portal=Math.abs(Math.sin(a))<.19;
   if(danger||portal)continue;
   dummy.position.set(Math.cos(a)*5.75,1.50,Math.sin(a)*5.75);dummy.updateMatrix();wall.setMatrixAt(count++,dummy.matrix);
  }
  wall.count=count;wall.instanceMatrix.needsUpdate=true;battleground.add(wall);
  // Upper guard trim makes the true 3D wall height visible to players.
- ringTube(5.75,.24,Math.PI/2-.31,3.19,cyan,.045);ringTube(5.75,Math.PI/2+.31,Math.PI-.24,3.19,cyan,.045);
- ringTube(5.75,Math.PI+.24,Math.PI*1.5-.31,3.19,cyan,.045);ringTube(5.75,Math.PI*1.5+.31,Math.PI*2-.24,3.19,cyan,.045);
+ ringTube(5.75,.22,Math.PI/2-.185,3.19,cyan,.045);ringTube(5.75,Math.PI/2+.185,Math.PI-.22,3.19,cyan,.045);
+ ringTube(5.75,Math.PI+.22,Math.PI*1.5-.185,3.19,cyan,.045);ringTube(5.75,Math.PI*1.5+.185,Math.PI*2-.22,3.19,cyan,.045);
  const laneMat=new THREE.MeshStandardMaterial({color:'#3cb9d9',metalness:.60,roughness:.28,transparent:true,opacity:.42,side:THREE.DoubleSide});
  const laneGeo=new THREE.CylinderGeometry(.245,.245,2.80,8);
  const laneWall=new THREE.InstancedMesh(laneGeo,laneMat,44);let laneCount=0;
@@ -57,7 +57,7 @@ function createStage(name){battleground.clear();stageName=name;
    }
  }
  laneWall.count=laneCount;laneWall.instanceMatrix.needsUpdate=true;battleground.add(laneWall);
- for(const sign of [-1,1]){const danger=mesh(new THREE.BoxGeometry(1.1,.07,.14),mat('#f35f44',.35,.25,'#ff4f25',1.3),battleground);danger.position.set(0,.12,sign*5.78);}
+ for(const sign of [-1,1]){const danger=mesh(new THREE.BoxGeometry(1.95,.07,.14),mat('#f35f44',.35,.25,'#ff4f25',1.3),battleground);danger.position.set(0,.12,sign*5.78);}
  const placements={colosseum:[[0,-3.2,.42],[0,3.2,.42]],vortex:[[-2.8,-2.35,.42],[2.8,2.35,.42],[-2.8,2.35,.38],[2.8,-2.35,.38]],tempest:[[0,-3.35,.46],[0,3.35,.46]],volcano:[[-2.9,-2.65,.50],[2.9,2.65,.50]],eclipse:[[-2.5,0,.44],[2.5,0,.44]]};
  for(const [x,z,r] of (placements[name]||placements.colosseum)){
    const core=mesh(new THREE.CylinderGeometry(r,r,.7,20),mat('#293c53',.74,.33),battleground);core.position.set(x,.35,z);core.castShadow=!mobile;

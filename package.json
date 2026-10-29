@@ -1,15 +1,16 @@
 {
   "name": "spin-break-arena",
-  "version": "9.0.0",
+  "version": "9.2.0",
   "private": true,
   "description": "Rapier 3D multiplayer spinning top physics battle - authoritative WebSocket server",
   "scripts": {
     "start": "node server.js",
-    "postinstall": "node scripts/copy-three.js && node test_3d.js && node test_v9.js && node test_guardrails.js && node scripts/smoke-multiplayer.js",
+    "postinstall": "node scripts/copy-three.js && node test_3d.js && node test_v9.js && node test_guardrails.js && node test_exit_tuning.js && node scripts/smoke-multiplayer.js",
     "test": "node test_multiplayer.js",
     "test:3d": "node test_3d.js",
     "test:v9": "node test_v9.js",
     "test:guardrails": "node test_guardrails.js",
+    "test:exits": "node test_exit_tuning.js",
     "verify:live": "node verify_live.js"
   },
   "dependencies": {
