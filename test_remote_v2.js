@@ -16,7 +16,7 @@ function client(label){
 }
 function get(path){return new Promise((resolve,reject)=>http.get('http://127.0.0.1:3000'+path,r=>{let str='';r.on('data',b=>str+=b);r.on('end',()=>resolve({code:r.statusCode,body:str,headers:r.headers}));}).on('error',reject));}
 async function run(){
- const health=await get('/health');assert.equal(health.code,200);assert.equal(JSON.parse(health.body).version,'2.0');
+ const health=await get('/health');assert.equal(health.code,200);assert.equal(JSON.parse(health.body).version,'3.0');
  const manifest=await get('/manifest.webmanifest');assert.equal(manifest.code,200);assert(manifest.headers['content-type'].includes('manifest+json'));
  const icon=await get('/icon-192.png');assert.equal(icon.code,200);
  const bad=await get('/../server.js');assert(bad.code===403||bad.code===404);
