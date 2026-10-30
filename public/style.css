@@ -80,3 +80,24 @@
 .anomaly-status.active{opacity:1;background:#172852df;border:1px solid #8fe0ff;box-shadow:0 0 18px #55baff66}
 .chaos-picker{padding:12px 0;border-top:1px solid #456278;margin-top:10px}.chaos-picker select{width:100%;font-size:13px;padding:10px;margin-top:5px;background:#0b1c2d;color:#def7ff;border:1px solid #6385a1;border-radius:7px}.chaos-picker p{font-size:11px;color:#abc9da;margin:6px 0 0}
 @media(max-width:720px){.touch-controller .touch-counter{width:60px!important;height:60px!important;min-width:60px!important;min-height:60px!important;font-size:11px}.touch-controller .touch-actions{gap:4px}.touch-controller .touch-actions .touch-guard,.touch-controller .touch-actions .touch-burst{width:63px!important;height:63px!important}}
+
+/* V10.2: Mobile controls are a dedicated dock below the arena; never cover 3D notices. */
+.stage-col > .touch-controller{position:relative;inset:auto;z-index:1;display:none;pointer-events:auto;width:100%;padding:0;box-sizing:border-box;}
+.stage-col > .touch-controller:not(.active){display:none!important}
+@media(max-width:720px), (hover:none) and (pointer:coarse){
+ .stage-col > .touch-controller.active{display:flex;flex-direction:column;align-items:stretch;gap:10px;margin:9px 0 0;padding:11px max(12px,env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left));border:1px solid #3a5676;border-radius:13px;background:linear-gradient(145deg,#162943,#0d172b);box-shadow:0 8px 32px #0007;}
+ .stage-col > .touch-controller .target-zone{display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:8px;max-width:none;width:100%;}
+ .stage-col > .touch-controller .target-zone span{flex:1;min-width:0;font-size:10px;text-align:right;line-height:1.35;}
+ .stage-col > .touch-controller .target-switch{max-width:60%;min-height:42px;white-space:normal;overflow-wrap:anywhere;font-size:11px;}
+ .stage-col > .touch-controller .touch-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:100%;gap:8px;align-items:center;justify-items:center;}
+ .stage-col > .touch-controller .touch-actions button{width:clamp(60px,16vw,74px)!important;height:clamp(60px,16vw,74px)!important;min-width:60px!important;min-height:60px!important;font-size:13px;}
+ .stage-frame .anomaly-status{top:25%;max-width:90%;font-size:12px;white-space:normal;overflow-wrap:anywhere;}
+ .stage-frame .event-toast{bottom:11%;max-width:90%;min-width:0;white-space:normal;overflow-wrap:anywhere;text-align:center;font-size:11px;line-height:1.35;padding:7px 11px;}
+ .stage-frame .impact-banner{top:46%;font-size:clamp(19px,6.4vw,38px);letter-spacing:0;}
+ .stage-frame .stage-top-fighters{row-gap:5px;}
+}
+@media(max-width:360px){
+ .stage-col > .touch-controller .target-zone span{display:none;}
+ .stage-col > .touch-controller .target-switch{max-width:none;width:100%;}
+ .stage-frame .anomaly-status{top:30%;}
+}

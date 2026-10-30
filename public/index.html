@@ -12,16 +12,16 @@
   <meta name="description" content="SPIN//BREAK ARENA：免費的即時多人戰鬥陀螺競技遊戲，12 款陀螺、5 大競技場、必殺技與房間對戰。" />
   <title>SPIN//BREAK ARENA | 戰鬥陀螺競技場</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-  <link rel="stylesheet" href="/style.css" />
-  <script src="/sync.js?v=10.1" defer></script>
-  <script src="/client.js?v=10.1" defer></script>
-  <script type="module" src="/arena3d.js?v=10.1"></script>
+  <link rel="stylesheet" href="/style.css?v=10.2" />
+  <script src="/sync.js?v=10.2" defer></script>
+  <script src="/client.js?v=10.2" defer></script>
+  <script type="module" src="/arena3d.js?v=10.2"></script>
 </head>
 <body>
   <div class="background-fx" aria-hidden="true"></div>
   <header class="site-header">
     <div class="brand"><div class="brand-mark"><span class="mark-disc"></span><span class="mark-core"></span></div><div><div class="brand-title">SPIN<span>//</span>BREAK</div><div class="brand-sub">ARENA · 次世代陀螺競技</div></div></div>
-    <div class="header-right"><div class="live-tag"><span class="live-dot" id="netDot"></span><span id="netState">正在連線</span></div><button id="btnSound" class="icon-btn" title="切換音效與節奏音樂">♫ <span id="soundText">音效關</span></button><span class="version">V10.1 · SYNCED ARENA</span></div>
+    <div class="header-right"><div class="live-tag"><span class="live-dot" id="netDot"></span><span id="netState">正在連線</span></div><button id="btnSound" class="icon-btn" title="切換音效與節奏音樂">♫ <span id="soundText">音效關</span></button><span class="version">V10.2 · IMPACT FX</span></div>
   </header>
   <div class="marquee"><div class="marquee-inner"><span>IGNITE YOUR SPIRIT <b>✦</b> 超越極限的碰撞 <b>✦</b> 576 種物理改造組合 <b>✦</b> 5 大決戰舞台 <b>✦</b> <strong>LET IT RIP</strong> <b>✦</b> 引爆你的鬥志 <b>✦</b> </span><span aria-hidden="true">IGNITE YOUR SPIRIT <b>✦</b> 超越極限的碰撞 <b>✦</b> 576 種物理改造組合 <b>✦</b> 5 大決戰舞台 <b>✦</b> <strong>LET IT RIP</strong> <b>✦</b> 引爆你的鬥志 <b>✦</b> </span></div></div>
   <main class="layout">
@@ -46,8 +46,9 @@
         <div class="center-overlay" id="centerOverlay"><div class="overlay-label">SPIN//BREAK ARENA</div><div class="overlay-heading">準備好<br/><em>燃燒鬥志</em>了嗎？</div><div class="overlay-sub">建立房間即可與 AI 對戰，或邀請朋友加入 2～4 人競技</div><button id="overlayPlay" class="primary-btn big-btn">立即開始對戰 <span>↗</span></button></div>
         <div class="anomaly-status" id="anomalyStatus" aria-live="polite"></div><div class="impact-banner" id="impactBanner"></div>
         <div class="event-toast" id="eventToast"></div>
-        <div class="touch-controller" id="touchController"><div class="target-zone"><button id="touchTarget" class="target-switch" type="button">◎ 切換鎖定目標</button><span>點擊場上的對手也可以鎖定</span></div><div class="touch-actions"><button class="touch-counter" id="touchCounter">反擊 <small>PARRY</small></button><button class="touch-guard" id="touchGuard">衝鋒 <small>CHARGE</small></button><button class="touch-burst" id="touchBurst">必殺 <small>SKILL</small></button></div></div>
+        
       </div>
+      <div class="touch-controller" id="touchController"><div class="target-zone"><button id="touchTarget" class="target-switch" type="button">◎ 切換鎖定目標</button><span>點擊場上的對手也可以鎖定</span></div><div class="touch-actions"><button class="touch-counter" id="touchCounter">反擊 <small>PARRY</small></button><button class="touch-guard" id="touchGuard">衝鋒 <small>CHARGE</small></button><button class="touch-burst" id="touchBurst">必殺 <small>SKILL</small></button></div></div>
       <div class="stage-foot"><div class="controls-keyboard"><span class="control-caption">操作方式</span><div class="key-group"><kbd>SPACE</kbd><span>鎖定衝鋒</span></div><div class="key-group"><kbd>K</kbd><span>反擊</span></div><div class="key-group"><kbd>J</kbd><span>必殺技</span></div><div class="key-group"><kbd>TAB</kbd><span>切換目標</span></div></div><div class="battle-tip">不需要控制移動！陀螺會自主巡航。看準時機按「衝鋒」撞飛對手，保留轉速再使用必殺技。</div></div>
       <div class="bottom-strap"><div class="strap-number">12<span>款獨特陀螺</span></div><div class="strap-divider"></div><div class="strap-number">05<span>座特殊競技場</span></div><div class="strap-divider"></div><div class="strap-number">04<span>人即時混戰</span></div><div class="strap-divider"></div><div class="strap-word">NO LIMITS. ONLY VICTORY.</div></div>
     </section>
