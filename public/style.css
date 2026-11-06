@@ -101,3 +101,17 @@
  .stage-col > .touch-controller .target-switch{max-width:none;width:100%;}
  .stage-frame .anomaly-status{top:30%;}
 }
+
+/* V10.3: quality switch lives in header, away from mobile action buttons. */
+.graphics-select-label{display:flex;align-items:center;gap:7px;color:#a6c7dd;font-weight:850;font-size:11px;white-space:nowrap}
+.graphics-select-label select{width:auto;min-width:76px;padding:7px 9px;font-size:12px;color:#ebf6ff;border:1px solid #52748b;background:#121e30;border-radius:7px}
+.graphics-fps{font-family:ui-monospace,Consolas,monospace;color:#84b8d0;font-size:10px;min-width:47px;text-align:right}
+@media(max-width:720px){
+ .site-header{min-height:72px;height:auto;flex-wrap:wrap;padding:10px 12px;row-gap:8px}
+ .header-right{margin-left:auto;gap:7px;flex-wrap:wrap;justify-content:flex-end}
+ .graphics-select-label{font-size:10px;gap:4px}
+ .graphics-select-label select{min-width:66px;padding:6px 5px;font-size:11px}
+ .graphics-fps{font-size:9px;min-width:38px}
+ .icon-btn{padding:6px 7px}
+}
+@media(max-width:360px){.header-right{width:100%;justify-content:space-between}.graphics-fps{min-width:35px}}

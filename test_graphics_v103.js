@@ -1,0 +1,16 @@
+'use strict';
+const fs=require('node:fs'),assert=require('node:assert/strict');
+const js=fs.readFileSync('public/arena3d.js','utf8'),html=fs.readFileSync('public/index.html','utf8');
+const css=fs.readFileSync('public/style.css','utf8');
+const pkg=JSON.parse(fs.readFileSync('package.json','utf8'));
+assert.equal(pkg.version,'10.3.0');
+for(const id of ['graphicsQuality','graphicsFps'])assert(html.includes(`id="${id}"`));
+for(const val of ['auto','low','medium','high'])assert(html.includes(`value="${val}"`));
+assert(html.includes('V10.3 · GRAPHICS REBORN'));
+assert(css.includes('.graphics-select-label'));
+for(const feature of ['PMREMGenerator','MeshPhysicalMaterial','floorTexture','makeMotionLayer','updateMotionLayer','groundShadowMap','applyGraphicsProfile','graphics.ratio','impactFocus','qualityChoice'])assert(js.includes(feature),feature);
+assert(js.includes('const source=()=>window.SPINBREAK_3D_BRIDGE'), 'Must use authoritative snapshots');
+assert(!js.includes('applyImpulse(') && !js.includes('world.step('),'Renderer must not simulate gameplay physics');
+assert(js.includes("graphics.level==='low'") && js.includes('fps<(mobile?39:46)'), 'Mobile performance controls must remain active');
+assert(js.includes('releaseMotionLayer(obj.motion)'),'Visual resources must be released');
+console.log('V10_3_GRAPHICS_PASS PBR=true proceduralFloor=true motionTrails=true contactShadows=true tiers=4 autoFPS=true');
