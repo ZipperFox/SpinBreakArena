@@ -1,4 +1,5 @@
 import * as THREE from './vendor/three.module.js';
+import {fitDistance, projectPoint} from './framing.mjs';
 // Actual WebGL 3D: dynamic rigid-body poses are broadcast from the authoritative Rapier server.
 const stage=document.getElementById('stage');
 const wrapper=document.getElementById('stageFrame');
@@ -222,13 +223,13 @@ function createStage(name){
 const models=new Map(),effects=[];
 // Roster badges are independent of spinning/tilting models, so every competitor
 // remains identifiable even when several tops overlap visually.
-function createFighterBadge(p,order,color){
+function createFighterBadge(p,order,color,isMine=false){
  const canvas=document.createElement('canvas');canvas.width=384;canvas.height=96;
  const ctx=canvas.getContext('2d');if(!ctx)return null;
  ctx.fillStyle='rgba(5,13,29,.82)';ctx.beginPath();ctx.roundRect(4,6,376,82,18);ctx.fill();
  ctx.strokeStyle=color||'#8bdfff';ctx.lineWidth=4;ctx.stroke();
  ctx.font='bold 37px system-ui, sans-serif';ctx.fillStyle='#f8fbff';ctx.textAlign='center';ctx.textBaseline='middle';
- const name=String(p.name||p.id).slice(0,12);ctx.fillText(`${order+1} · ${name}`,192,46,350);
+ const name=String(p.name||p.id).slice(0,12);ctx.fillText(isMine?`★ 你 · ${name}`:`${order+1} · ${name}`,192,46,350);
  const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;
  const material=new THREE.SpriteMaterial({map:texture,transparent:true,depthTest:false,depthWrite:false});
  const badge=new THREE.Sprite(material);badge.scale.set(1.65,.42,1);badge.renderOrder=200;scene.add(badge);
@@ -574,6 +575,13 @@ function releaseMotionLayer(layer){
  scene.remove(layer.trail,layer.shadow);layer.trail.geometry.dispose();layer.trail.material.dispose();layer.shadow.material.dispose();
 }
 let impactFocus=null;
+// Visible through translucent guards so the player never loses their own top in a crowded arena.
+const myMarker=new THREE.Group();scene.add(myMarker);
+const myHalo=new THREE.Mesh(new THREE.RingGeometry(.53,.69,48),new THREE.MeshBasicMaterial({color:'#7bf8ff',side:THREE.DoubleSide,transparent:true,opacity:.90,depthTest:false,depthWrite:false}));
+myHalo.rotation.x=-Math.PI/2;myHalo.renderOrder=180;myMarker.add(myHalo);
+const myArrow=new THREE.Mesh(new THREE.ConeGeometry(.16,.27,5),new THREE.MeshBasicMaterial({color:'#ffffff',depthTest:false,depthWrite:false}));
+myArrow.position.y=.95;myArrow.rotation.z=Math.PI;myArrow.renderOrder=181;myMarker.add(myArrow);
+myMarker.visible=false;
 const targetIndicator=new THREE.Group();scene.add(targetIndicator);
 const circle=mesh(new THREE.TorusGeometry(.66,.018,6,42),new THREE.MeshBasicMaterial({color:'#ffdf86',transparent:true,opacity:.9,depthTest:false}),targetIndicator);circle.rotation.x=Math.PI/2;
 const marker=mesh(new THREE.ConeGeometry(.12,.25,4),new THREE.MeshBasicMaterial({color:'#ffe8a7',depthTest:false}),targetIndicator);marker.position.y=.65;marker.rotation.z=Math.PI;
@@ -584,11 +592,18 @@ function loop(t){requestAnimationFrame(loop);const dt=Math.min(.05,Math.max(.001
  const active=new Set();const fighters=s?.fighters||[];
  for(const [index,p] of fighters.entries()){active.add(p.id);let obj=models.get(p.id);
    // Never silently lose a competitor merely because a top definition arrives late.
-   const top=state.tops?.find(t=>t.id===p.top)||state.tops?.[0];
-   if(!obj){if(!top)continue;const group=buildTop(top,p.build);group.userData.fighterId=p.id;scene.add(group);
+   const top=state.tops?.find(t=>t.id===p.top)||state.tops?.[0]||{id:p.top,color:'#72d9ed',accent:'#ffffff',blade:{lobes:5,shape:'wave'}};
+   if(!obj){let group;
+     try{group=buildTop(top,p.build||{});}
+     catch(error){
+       console.error('[SpinBreak 3D] top model failed; restoring a visible fallback',p.id,error);
+       group=new THREE.Group();mesh(new THREE.CylinderGeometry(.40,.40,.19,40),new THREE.MeshStandardMaterial({color:top.color||'#72d9ed',metalness:.8,roughness:.28}),group);
+       mesh(new THREE.CylinderGeometry(.14,.14,.065,24),new THREE.MeshStandardMaterial({color:'#f4f8ff',metalness:.72,roughness:.24}),group).position.y=.15;
+     }
+     group.userData.fighterId=p.id;scene.add(group);
      obj={group,targetP:new THREE.Vector3(),targetQ:new THREE.Quaternion(),motion:makeMotionLayer(top.color||'#6fefff'),
-       badge:createFighterBadge(p,index,top.accent||top.color),lastX:0,lastZ:0};models.set(p.id,obj);}
-   obj.group.visible=!!p.alive||s?.time<5;
+       badge:createFighterBadge(p,index,p.id===state.ownId?'#6af6ff':top.accent||top.color,p.id===state.ownId),lastX:0,lastZ:0};models.set(p.id,obj);}
+   obj.group.visible=!!p.alive||s?.time<5; // The UI now explicitly explains an early local KO.
    obj.targetP.set((p.x||0)/40,(p.h||0)/40,(p.y||0)/40);
    if(Array.isArray(p.q)){
       const q=new THREE.Quaternion(...p.q).normalize();
@@ -606,10 +621,16 @@ function loop(t){requestAnimationFrame(loop);const dt=Math.min(.05,Math.max(.001
    const tail=obj.group.userData.tail;if(!tail){const line=mesh(new THREE.TorusGeometry(.53,.020,6,30),mat(top?.color||'#5be2ef',.1,.7,top?.color||'#5be2ef',.8),obj.group);line.position.y=-.02;line.rotation.x=Math.PI/2;obj.group.userData.tail=line;}else tail.visible=!!p.charging||!!p.boost||!!p.countering;
  }
  for(const [id,obj] of models)if(!active.has(id)){releaseFighter(obj);models.delete(id);}
+ const myActor=fighters.find(p=>p.id===state.ownId),myModel=models.get(state.ownId);
+ myMarker.visible=!!(myActor?.alive&&myModel?.group.visible);
+ if(myMarker.visible){myMarker.position.set(myModel.group.position.x,.16,myModel.group.position.z);myMarker.rotation.y=time*.4;}
  window.SPINBREAK_RENDER_DIAGNOSTICS={serverFighters:fighters.length,models:models.size,
   activeModels:[...models.entries()].filter(([id,o])=>o.group.visible&&active.has(id)).map(([id])=>id),
   missingModels:fighters.filter(p=>p.alive&&!models.has(p.id)).map(p=>p.id),
-  eliminated:fighters.filter(p=>!p.alive).map(p=>({id:p.id,reason:p.reason}))};
+  eliminated:fighters.filter(p=>!p.alive).map(p=>({id:p.id,reason:p.reason})),
+  own:{id:state.ownId||null,present:!!myActor,alive:!!myActor?.alive,
+       model:!!myModel,visible:!!myModel?.group.visible,
+       reason:myActor?.reason||'',x:myActor?.x,z:myActor?.y}};
  const activeTarget=models.get(state.targetId);targetIndicator.visible=!!(activeTarget&&s?.fighters?.find(x=>x.id===state.targetId)?.alive);
  if(activeTarget){targetIndicator.position.set(activeTarget.group.position.x,.4,activeTarget.group.position.z);marker.rotation.y+=dt*4;}
  const center=new THREE.Vector3(0,.5,0); // visualization only; authoritative positions stay unchanged
@@ -617,10 +638,20 @@ function loop(t){requestAnimationFrame(loop);const dt=Math.min(.05,Math.max(.001
   else{push=Math.pow(impactFocus.life/impactFocus.max,1.2);center.x=impactFocus.x*.20*push;center.z=impactFocus.z*.20*push;}}
  const pitch=camPitch,combatants=fighters.filter(x=>x.alive).length;
  const framing=combatants===2?Math.min(zoom,13.8):zoom;
- const dist=(mobile?framing*1.05:framing)-push*(mobile?.35:.85);
+ // Keep *every living fighter*, including the local player, inside the camera.
+ // High-speed rail returns at the rim otherwise disappear from the narrow phone view.
+ const baseDist=(mobile?framing*1.05:framing)-push*(mobile?.35:.85);
+ const dist=fitDistance(fighters,{yaw:cameraYaw,pitch,fov:cam.fov,aspect:cam.aspect,baseDistance:baseDist,maxDistance:36});
  const desired=new THREE.Vector3(Math.sin(cameraYaw)*Math.cos(pitch)*dist,Math.sin(pitch)*dist,Math.cos(cameraYaw)*Math.cos(pitch)*dist).add(center);
  if(shake>.001){desired.x+=(Math.random()-.5)*shake;desired.y+=(Math.random()-.5)*shake;shake*=Math.pow(.03,dt);}else shake=0;
- cam.position.lerp(desired,Math.min(1,dt*5));cam.lookAt(center);
+ // Fast zoom-out for a fighter approaching the edge; a slower zoom-in avoids jitter.
+ const requiredRadius=desired.distanceTo(center),currentRadius=cam.position.distanceTo(center);
+ cam.position.lerp(desired,Math.min(1,dt*(requiredRadius>currentRadius?13:3.5)));cam.lookAt(center);
+ if(myActor?.alive&&myModel){
+   const projection=projectPoint({x:myActor.x/40,y:myActor.h/40,z:myActor.y/40},
+       {yaw:cameraYaw,pitch,dist:cam.position.distanceTo(center),fov:cam.fov,aspect:cam.aspect,center});
+   window.SPINBREAK_RENDER_DIAGNOSTICS.own.withinFrame=projection.visible;
+ }
  battleground.rotation.y=0;
  for(let i=effects.length-1;i>=0;i--){const p=effects[i];p.life-=dt;
   if(p.life<=0){scene.remove(p.m);if(p.type==='sparks')p.m.geometry.dispose();p.m.material.dispose();effects.splice(i,1);continue;}
