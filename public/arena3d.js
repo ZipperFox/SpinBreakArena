@@ -133,6 +133,26 @@ function createStage(name){
  const middle=mesh(new THREE.CylinderGeometry(1.16,1.16,.015,40),new THREE.MeshBasicMaterial({color:hot,transparent:true,opacity:.06}),battleground);middle.position.y=.029;
 }
 const models=new Map(),effects=[];
+// Roster badges are independent of spinning/tilting models, so every competitor
+// remains identifiable even when several tops overlap visually.
+function createFighterBadge(p,order,color){
+ const canvas=document.createElement('canvas');canvas.width=384;canvas.height=96;
+ const ctx=canvas.getContext('2d');if(!ctx)return null;
+ ctx.fillStyle='rgba(5,13,29,.82)';ctx.beginPath();ctx.roundRect(4,6,376,82,18);ctx.fill();
+ ctx.strokeStyle=color||'#8bdfff';ctx.lineWidth=4;ctx.stroke();
+ ctx.font='bold 37px system-ui, sans-serif';ctx.fillStyle='#f8fbff';ctx.textAlign='center';ctx.textBaseline='middle';
+ const name=String(p.name||p.id).slice(0,12);ctx.fillText(`${order+1} · ${name}`,192,46,350);
+ const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;
+ const material=new THREE.SpriteMaterial({map:texture,transparent:true,depthTest:false,depthWrite:false});
+ const badge=new THREE.Sprite(material);badge.scale.set(1.65,.42,1);badge.renderOrder=200;scene.add(badge);
+ return badge;
+}
+function releaseFighter(obj){
+ releaseMotionLayer(obj.motion);
+ scene.remove(obj.group);obj.group.traverse(o=>{if(o.isMesh){o.geometry?.dispose();o.material?.dispose();}});
+ if(obj.badge){scene.remove(obj.badge);obj.badge.material.map?.dispose();obj.badge.material.dispose();}
+}
+
 // V9.3 visual-only redesign: game-scale layered mechanical spinning tops.
 // Keep every mesh inside the original ~0.5 m collision footprint; Rapier remains authoritative.
 function buildTop(top,parts={}){
@@ -475,9 +495,13 @@ function loop(t){requestAnimationFrame(loop);const dt=Math.min(.05,Math.max(.001
  const rect=wrapper.getBoundingClientRect(),w=Math.max(2,Math.floor(rect.width)),h=Math.max(2,Math.floor(rect.height));if(w!==baseline?.w||h!==baseline?.h){renderer.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix();baseline={w,h};}
  updateAnomaly3D(s,dt);
  const active=new Set();const fighters=s?.fighters||[];
- for(const p of fighters){active.add(p.id);let obj=models.get(p.id);const top=state.tops?.find(t=>t.id===p.top);
-   if(!obj){if(!top)continue;const group=buildTop(top,p.build);group.userData.fighterId=p.id;scene.add(group);obj={group,targetP:new THREE.Vector3(),targetQ:new THREE.Quaternion(),motion:makeMotionLayer(top.color||'#6fefff'),lastX:0,lastZ:0};models.set(p.id,obj);}
-   obj.group.visible=p.alive||s?.time<5;
+ for(const [index,p] of fighters.entries()){active.add(p.id);let obj=models.get(p.id);
+   // Never silently lose a competitor merely because a top definition arrives late.
+   const top=state.tops?.find(t=>t.id===p.top)||state.tops?.[0];
+   if(!obj){if(!top)continue;const group=buildTop(top,p.build);group.userData.fighterId=p.id;scene.add(group);
+     obj={group,targetP:new THREE.Vector3(),targetQ:new THREE.Quaternion(),motion:makeMotionLayer(top.color||'#6fefff'),
+       badge:createFighterBadge(p,index,top.accent||top.color),lastX:0,lastZ:0};models.set(p.id,obj);}
+   obj.group.visible=!!p.alive||s?.time<5;
    obj.targetP.set((p.x||0)/40,(p.h||0)/40,(p.y||0)/40);
    if(Array.isArray(p.q)){
       const q=new THREE.Quaternion(...p.q).normalize();
@@ -490,10 +514,15 @@ function loop(t){requestAnimationFrame(loop);const dt=Math.min(.05,Math.max(.001
    }
    if(!obj.group.userData.init){obj.group.position.copy(obj.targetP);obj.group.quaternion.copy(obj.targetQ);obj.group.userData.init=true;}
    else{obj.group.position.copy(obj.targetP);obj.group.quaternion.copy(obj.targetQ);}
+   if(obj.badge){obj.badge.visible=!!p.alive;obj.badge.position.set(obj.group.position.x,obj.group.position.y+1.15,obj.group.position.z);}
    updateMotionLayer(obj,p,Number.isFinite(s?.time)?s.time:time);
    const tail=obj.group.userData.tail;if(!tail){const line=mesh(new THREE.TorusGeometry(.53,.020,6,30),mat(top?.color||'#5be2ef',.1,.7,top?.color||'#5be2ef',.8),obj.group);line.position.y=-.02;line.rotation.x=Math.PI/2;obj.group.userData.tail=line;}else tail.visible=!!p.charging||!!p.boost||!!p.countering;
  }
- for(const [id,obj] of models)if(!active.has(id)){releaseMotionLayer(obj.motion);scene.remove(obj.group);obj.group.traverse(o=>{if(o.isMesh){o.geometry.dispose();o.material.dispose();}});models.delete(id);}
+ for(const [id,obj] of models)if(!active.has(id)){releaseFighter(obj);models.delete(id);}
+ window.SPINBREAK_RENDER_DIAGNOSTICS={serverFighters:fighters.length,models:models.size,
+  activeModels:[...models.entries()].filter(([id,o])=>o.group.visible&&active.has(id)).map(([id])=>id),
+  missingModels:fighters.filter(p=>p.alive&&!models.has(p.id)).map(p=>p.id),
+  eliminated:fighters.filter(p=>!p.alive).map(p=>({id:p.id,reason:p.reason}))};
  const activeTarget=models.get(state.targetId);targetIndicator.visible=!!(activeTarget&&s?.fighters?.find(x=>x.id===state.targetId)?.alive);
  if(activeTarget){targetIndicator.position.set(activeTarget.group.position.x,.4,activeTarget.group.position.z);marker.rotation.y+=dt*4;}
  const center=new THREE.Vector3(0,.5,0); // visualization only; authoritative positions stay unchanged

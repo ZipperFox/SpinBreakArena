@@ -15,7 +15,7 @@ async function run(){const checkHttp=await new Promise((resolve,reject)=>http.ge
  await a.wait(m=>m.t==='room'&&m.room.players.length===4);a.send({t:'arena',id:'volcano'});await a.wait(m=>m.t==='room'&&m.room.arena==='volcano');
  a.send({t:'start'});await Promise.all([a,b,c,d].map(x=>x.wait(m=>m.t==='room'&&m.room.status==='playing')));
  const snaps=await Promise.all([a,b,c,d].map(x=>x.wait(m=>m.t==='tick'&&Array.isArray(m.fighters)&&m.fighters.length===4)));
- assert(snaps.every(x=>x.fighters.length===4 && x.physics==='rapier3d'));assert(snaps.every(x=>x.fighters.find(f=>f.id===a.id).launch.power===100));assert(snaps.every(x=>x.fighters.every(f=>Number.isFinite(f.h)&&f.q?.length===4)));const ids=snaps.map(x=>x.fighters.map(f=>f.id).sort().join(','));assert(ids.every(x=>x===ids[0]),'Players disagree on fighters');
+ assert(snaps.every(x=>x.fighters.length===4 && x.physics==='rapier3d'));assert(snaps.every(x=>x.rosterExpected===4&&x.rosterActual===4&&x.aliveCount<=4),'Four registered fighters must be confirmed by authoritative server');assert(snaps.every(x=>x.fighters.find(f=>f.id===a.id).launch.power===100));assert(snaps.every(x=>x.fighters.every(f=>Number.isFinite(f.h)&&f.q?.length===4)));const ids=snaps.map(x=>x.fighters.map(f=>f.id).sort().join(','));assert(ids.every(x=>x===ids[0]),'Players disagree on fighters');
  // Snapshot content must be identical across all four clients for the SAME server frame.
  const checkSeq=Math.max(...snaps.map(x=>x.seq))+4;
  const synced=await Promise.all([a,b,c,d].map(x=>x.wait(m=>m.t==='tick'&&m.seq===checkSeq,5000)));

@@ -12,16 +12,17 @@
   <meta name="description" content="SPIN//BREAK ARENA：免費的即時多人戰鬥陀螺競技遊戲，12 款陀螺、5 大競技場、必殺技與房間對戰。" />
   <title>SPIN//BREAK ARENA | 戰鬥陀螺競技場</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-  <link rel="stylesheet" href="/style.css?v=10.3" />
-  <script src="/sync.js?v=10.3" defer></script>
-  <script src="/client.js?v=10.3" defer></script>
-  <script type="module" src="/arena3d.js?v=10.3"></script>
+  <link rel="stylesheet" href="/style.css?v=10.4" />
+  <script src="/sync.js?v=10.4" defer></script>
+  <script src="/audio.js?v=10.4" defer></script>
+  <script src="/client.js?v=10.4" defer></script>
+  <script type="module" src="/arena3d.js?v=10.4"></script>
 </head>
 <body>
   <div class="background-fx" aria-hidden="true"></div>
   <header class="site-header">
     <div class="brand"><div class="brand-mark"><span class="mark-disc"></span><span class="mark-core"></span></div><div><div class="brand-title">SPIN<span>//</span>BREAK</div><div class="brand-sub">ARENA · 次世代陀螺競技</div></div></div>
-    <div class="header-right"><div class="live-tag"><span class="live-dot" id="netDot"></span><span id="netState">正在連線</span></div><label class="graphics-select-label" for="graphicsQuality">畫質 <select id="graphicsQuality" aria-label="遊戲畫質"><option value="auto">自動</option><option value="low">流暢</option><option value="medium">標準</option><option value="high">精緻</option></select></label><span id="graphicsFps" class="graphics-fps" aria-live="off">— FPS</span><button id="btnSound" class="icon-btn" title="切換音效與節奏音樂">♫ <span id="soundText">音效關</span></button><span class="version">V10.3 · GRAPHICS REBORN</span></div>
+    <div class="header-right"><div class="live-tag"><span class="live-dot" id="netDot"></span><span id="netState">正在連線</span></div><label class="graphics-select-label" for="graphicsQuality">畫質 <select id="graphicsQuality" aria-label="遊戲畫質"><option value="auto">自動</option><option value="low">流暢</option><option value="medium">標準</option><option value="high">精緻</option></select></label><span id="graphicsFps" class="graphics-fps" aria-live="off">— FPS</span><button id="btnSound" class="icon-btn" title="開啟或關閉戰鬥音效（無背景循環音樂）">♫ <span id="soundText">音效關</span></button><span class="version">V10.4 · ROSTER & SFX</span></div>
   </header>
   <div class="marquee"><div class="marquee-inner"><span>IGNITE YOUR SPIRIT <b>✦</b> 超越極限的碰撞 <b>✦</b> 576 種物理改造組合 <b>✦</b> 5 大決戰舞台 <b>✦</b> <strong>LET IT RIP</strong> <b>✦</b> 引爆你的鬥志 <b>✦</b> </span><span aria-hidden="true">IGNITE YOUR SPIRIT <b>✦</b> 超越極限的碰撞 <b>✦</b> 576 種物理改造組合 <b>✦</b> 5 大決戰舞台 <b>✦</b> <strong>LET IT RIP</strong> <b>✦</b> 引爆你的鬥志 <b>✦</b> </span></div></div>
   <main class="layout">
@@ -38,7 +39,7 @@
       </div>
     </aside>
     <section class="stage-col">
-      <div class="stage-header"><div><div class="eyebrow">LIVE COMBAT FEED / 實況戰鬥</div><div class="stage-title" id="stageTitle">王者競技場 <span>· COLOSSEUM</span></div></div><div class="stage-timer"><span id="roundState">STANDBY</span><strong id="gameTimer">01:30</strong></div></div>
+      <div class="stage-header"><div><div class="eyebrow">LIVE COMBAT FEED / 實況戰鬥</div><div class="stage-title" id="stageTitle">王者競技場 <span>· COLOSSEUM</span></div></div><div class="stage-timer"><span id="roundState">STANDBY</span><small id="arenaRosterStatus" class="arena-roster-status" aria-live="polite"></small><strong id="gameTimer">01:30</strong></div></div>
       <div class="stage-frame" id="stageFrame">
         <canvas id="stage" width="1000" height="740" aria-label="戰鬥陀螺競技場畫面"></canvas>
         <div class="corner-mark tl"></div><div class="corner-mark tr"></div><div class="corner-mark bl"></div><div class="corner-mark br"></div>

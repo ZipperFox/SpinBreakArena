@@ -159,12 +159,21 @@ function start(r){if(r.status!=='lobby')return;if(r.players.filter(x=>x.connecte
  const active=[...rooms.values()].filter(x=>x.status==='playing').length;
  if(active>=12){broadcast(r,{t:'error',msg:'3D 物理房間已滿，請稍後再開房'});return;}
  r.round++;r.frameSeq=0;r.status='playing';r.age=0;r.results=null;r.hitPairs.clear();r.events=[];
- try{r.fighters=fightersFor(r);}catch(e){r.status='lobby';console.error('[physics3d]',e);broadcast(r,{t:'error',msg:'3D 物理引擎初始化失敗'});return;}
+ try{
+  r.fighters=fightersFor(r);
+  const expected=r.players.length+r.bots;
+  if(r.fighters.length!==expected||new Set(r.fighters.map(f=>f.id)).size!==expected)
+   throw new Error(`Fighter roster mismatch: got ${r.fighters.length}, expected ${expected}`);
+  r.rosterExpected=expected;
+ }catch(e){r.status='lobby';console.error('[physics3d]',e);broadcast(r,{t:'error',msg:'四人參賽者生成不完整，已取消開賽以避免不同步'});return;}
  broadcast(r,{t:'room',room:publicRoom(r)});broadcastFrame(r);event(r,'start','3D PHYSICS / LET IT RIP!','',0);
 }
 function broadcastFrame(r){
  if(!engine||!r.fighters?.length)return;
  const state=engine.snapshot(r);
+ state.rosterExpected=r.rosterExpected??(r.players.length+r.bots);
+ state.rosterActual=state.fighters.length;
+ state.aliveCount=state.fighters.filter(p=>p.alive).length;
  state.round=r.round;
  state.seq=++r.frameSeq;
  state.serverNow=now();
@@ -209,7 +218,7 @@ function parseFrames(ws,chunk){ws.buffer=Buffer.concat([ws.buffer,chunk]);if(ws.
  } }
 const mime={'.webmanifest':'application/manifest+json','.png':'image/png','.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.ico':'image/x-icon'};
 const server=http.createServer((req,res)=>{
-  if(req.url==='/health'){res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({ok:true,game:'spin-break-arena',version:'10.1',physics:'rapier3d',rooms:rooms.size,uptime:Math.round(process.uptime())}));return;}
+  if(req.url==='/health'){res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({ok:true,game:'spin-break-arena',version:'10.4',physics:'rapier3d',rooms:rooms.size,uptime:Math.round(process.uptime())}));return;}
   if(req.method!=='GET'&&req.method!=='HEAD'){res.writeHead(405);res.end('Method not allowed');return;}
   let uri;try{uri=decodeURIComponent((req.url||'/').split('?')[0]);}catch{res.writeHead(400);res.end('Invalid path');return;}const file=path.resolve(ROOT,'.'+(uri==='/'?'/index.html':uri));
   if(!file.startsWith(ROOT+path.sep)){res.writeHead(403);res.end();return;}
@@ -224,7 +233,7 @@ server.on('upgrade',(req,sock,head)=>{
   sock.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: '+key+'\r\n\r\n');
   const ws={id:'P'+(++nextClient),sock,closed:false,buffer:Buffer.alloc(0),room:null,rateStart:now(),rateCount:0};sockets.add(ws);
   sock.on('data',c=>{if(!ws.closed)parseFrames(ws,c);});sock.on('close',()=>disconnect(ws));sock.on('error',()=>disconnect(ws));sock.setNoDelay(true);if(head.length)parseFrames(ws,head);
-  send(ws,{t:'hello',id:ws.id,tops:TOPS,arenas:ARENAS,parts:PARTS,version:'10.1' });
+  send(ws,{t:'hello',id:ws.id,tops:TOPS,arenas:ARENAS,parts:PARTS,version:'10.4' });
 });
 if (require.main === module) {
   PHYSICS.init().then(()=>{engine=PHYSICS.makeEngine(TOPS,PARTS,{event,ko,finish});console.log('[SPIN//BREAK] RAPier 3D engine initialized');}) .catch(e=>{console.error('[SPIN//BREAK] Rapier initialization failed:',e);process.exit(1);});
