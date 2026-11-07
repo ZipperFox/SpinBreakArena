@@ -216,9 +216,9 @@ function parseFrames(ws,chunk){ws.buffer=Buffer.concat([ws.buffer,chunk]);if(ws.
   try{handle(ws,JSON.parse(payload.toString('utf8')));}catch{}
   if(ws.closed)return;
  } }
-const mime={'.webmanifest':'application/manifest+json','.png':'image/png','.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.ico':'image/x-icon'};
+const mime={'.webmanifest':'application/manifest+json','.png':'image/png','.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.ico':'image/x-icon','.wav':'audio/wav'};
 const server=http.createServer((req,res)=>{
-  if(req.url==='/health'){res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({ok:true,game:'spin-break-arena',version:'10.4',physics:'rapier3d',rooms:rooms.size,uptime:Math.round(process.uptime())}));return;}
+  if(req.url==='/health'){res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({ok:true,game:'spin-break-arena',version:'10.5',physics:'rapier3d',rooms:rooms.size,uptime:Math.round(process.uptime())}));return;}
   if(req.method!=='GET'&&req.method!=='HEAD'){res.writeHead(405);res.end('Method not allowed');return;}
   let uri;try{uri=decodeURIComponent((req.url||'/').split('?')[0]);}catch{res.writeHead(400);res.end('Invalid path');return;}const file=path.resolve(ROOT,'.'+(uri==='/'?'/index.html':uri));
   if(!file.startsWith(ROOT+path.sep)){res.writeHead(403);res.end();return;}
@@ -233,7 +233,7 @@ server.on('upgrade',(req,sock,head)=>{
   sock.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: '+key+'\r\n\r\n');
   const ws={id:'P'+(++nextClient),sock,closed:false,buffer:Buffer.alloc(0),room:null,rateStart:now(),rateCount:0};sockets.add(ws);
   sock.on('data',c=>{if(!ws.closed)parseFrames(ws,c);});sock.on('close',()=>disconnect(ws));sock.on('error',()=>disconnect(ws));sock.setNoDelay(true);if(head.length)parseFrames(ws,head);
-  send(ws,{t:'hello',id:ws.id,tops:TOPS,arenas:ARENAS,parts:PARTS,version:'10.4' });
+  send(ws,{t:'hello',id:ws.id,tops:TOPS,arenas:ARENAS,parts:PARTS,version:'10.5' });
 });
 if (require.main === module) {
   PHYSICS.init().then(()=>{engine=PHYSICS.makeEngine(TOPS,PARTS,{event,ko,finish});console.log('[SPIN//BREAK] RAPier 3D engine initialized');}) .catch(e=>{console.error('[SPIN//BREAK] Rapier initialization failed:',e);process.exit(1);});

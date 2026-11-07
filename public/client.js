@@ -4,6 +4,10 @@ const $ = id => document.getElementById(id);
 const els = Object.fromEntries(['roster','profile','topType','bigTop','topName','topSkill','topStats','statTotal','typeFilters','netDot','netState','btnSound','soundText','bladeSelect','ratchetSelect','bitSelect','buildInfo','garage3d','paintSelect','paintReset','presetSelect','presetSave','presetLoad','launchPower','launchAngle','launchLane','launchPowerValue','launchAngleValue','stage','stageFrame','stageTitle','gameTimer','roundState','fightHud','centerOverlay','overlayPlay','impactBanner','eventToast','playerName','roomInput','btnCreate','btnJoin','roomMessage','lobbyHeading','lobbyStatus','roomCode','btnCopy','btnShare','participants','arenaSelect','arenaDescription','botCount','btnStart','btnAgain','btnLeave','scoreboard','combatLog','touchTarget','touchBurst','touchGuard','touchCounter','touchController','chaosSelect','anomalyStatus','arenaRosterStatus'].map(x=>[x,$(x)]));
 const ctx=els.stage.getContext('2d',{alpha:false});
 const soundEngine=window.SPINBREAK_AUDIO?.create?.();
+const effectsVolume=document.getElementById('effectsVolume');
+try{const volume=localStorage.getItem('spinbreak-effects-volume');if(volume!==null&&effectsVolume)effectsVolume.value=String(Math.min(100,Math.max(0,+volume)));}catch{}
+soundEngine?.setVolume?.(Number(effectsVolume?.value ?? 50)/100);
+effectsVolume?.addEventListener('input',()=>{soundEngine?.setVolume?.(Number(effectsVolume.value)/100);try{localStorage.setItem('spinbreak-effects-volume',effectsVolume.value);}catch{}});
 let ws,ownId=null,room=null,tops=[],arenas=[],parts={ratchets:[],bits:[]},selected='phoenix',build={ratchet:'wide7',bit:'taper',paint:null},launch={power:85,angle:0,lane:0},filter='全部',latest=null,vis={},particles=[],shockwaves=[],trails={},logEntries=[],lastEvent='',status='offline',audioOn=false;
 let playTime=0,flash=0,shake=0,bannerTimer=null,toastTimer=null,gameOverShown=false;
 const timeline=new window.SPINBREAK_SYNC.Timeline(160);
@@ -216,7 +220,8 @@ els.btnSound.addEventListener('click',()=>{
  if(!soundEngine)return;
  if(audioOn){soundEngine.disable();audioOn=false;}
  else audioOn=soundEngine.enable();
- els.soundText.textContent=audioOn?'音效開':'音效關';
+ els.soundText.textContent=audioOn?'音效載入中':'音效關';
+ if(audioOn)soundEngine.ready?.().then(()=>{if(audioOn)els.soundText.textContent=soundEngine.loadedCount()>0?'音效開':'音效無法載入';});
 });
 // Canvas rendering system. World: -285 .. 285, centered at (500,H/2).
 const PI=Math.PI,TAU=2*Math.PI;

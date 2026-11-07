@@ -70,30 +70,116 @@ const mat=(color,metalness=.4,roughness=.35,emissive=null,emissiveIntensity=0)=>
 function mesh(geometry,material,parent=scene){const m=new THREE.Mesh(geometry,material);parent.add(m);return m;}
 const palette={colosseum:['#142943','#ff9955','#54e9fa'],vortex:['#101d49','#6395ff','#ca9dff'],tempest:['#0b2c44','#6ef4ff','#e4eaaa'],volcano:['#452134','#ff6b3b','#ffdd83'],eclipse:['#241b45','#d785ff','#90baff']};
 const battleground=new THREE.Group();scene.add(battleground);
-// Lightweight machined floor with engraved panel seams, luminous rings and brushed surface.
-const floorCanvas=document.createElement('canvas');floorCanvas.width=floorCanvas.height=512;
-const floorContext=floorCanvas.getContext('2d');
-function floorTexture(){
- const ctx=floorContext;if(!ctx)return null;
- const c=256;ctx.fillStyle='#152334';ctx.fillRect(0,0,512,512);
- const grad=ctx.createRadialGradient(c,c,8,c,c,255);grad.addColorStop(0,'#32485d');grad.addColorStop(.50,'#1c3044');grad.addColorStop(.94,'#101d30');grad.addColorStop(1,'#345269');ctx.fillStyle=grad;ctx.fillRect(0,0,512,512);
- ctx.save();ctx.translate(c,c);
- for(let i=0;i<64;i++){const a=i*Math.PI/32;ctx.beginPath();ctx.moveTo(48*Math.cos(a),48*Math.sin(a));ctx.lineTo(246*Math.cos(a),246*Math.sin(a));ctx.strokeStyle=i%4===0?'rgba(154,201,232,.23)':'rgba(167,199,226,.055)';ctx.lineWidth=i%4===0?1.7:.75;ctx.stroke();}
- for(const [r,alpha,width] of [[52,.4,3],[89,.23,2],[141,.16,2],[194,.33,3],[232,.35,2]]){ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.strokeStyle=`rgba(134,211,244,${alpha})`;ctx.lineWidth=width;ctx.stroke();}
- for(let r=57;r<236;r+=3.5){ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.strokeStyle='rgba(196,217,238,.024)';ctx.lineWidth=.9;ctx.stroke();}
- ctx.restore();
- const t=new THREE.CanvasTexture(floorCanvas);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=Math.min(4,renderer.capabilities.getMaxAnisotropy());return t;
+// V10.5: five distinct *visual* arenas. The floor is a decal; stage scenery stays
+// outside the collision radius and can never imply a new physical obstacle.
+const floorTextureCache=new Map();
+const stageMood={
+ colosseum:{sky:'#18111d',fog:'#281724',floor:'#8a6249',acc:'#ffbd70',accent:'#e75342'},
+ vortex:{sky:'#090b26',fog:'#161140',floor:'#342564',acc:'#b88bff',accent:'#4fd5f8'},
+ tempest:{sky:'#061e32',fog:'#102a45',floor:'#124d64',acc:'#8fefff',accent:'#d8fcff'},
+ volcano:{sky:'#240b0b',fog:'#381013',floor:'#4b1a16',acc:'#ff742b',accent:'#ffcb50'},
+ eclipse:{sky:'#11121f',fog:'#171828',floor:'#353444',acc:'#ffdf91',accent:'#9caaff'}
+};
+function makeStageFloor(name){
+ if(floorTextureCache.has(name))return floorTextureCache.get(name);
+ const canvas=document.createElement('canvas');canvas.width=canvas.height=512;
+ const ctx=canvas.getContext('2d');if(!ctx)return null;
+ const spec=stageMood[name]||stageMood.colosseum,c=256,tau=Math.PI*2;
+ const base=ctx.createRadialGradient(c,c,0,c,c,256);
+ base.addColorStop(0,name==='volcano'?'#261b22':name==='eclipse'?'#3c3549':spec.floor);
+ base.addColorStop(.74,spec.floor);base.addColorStop(1,'#090e17');ctx.fillStyle=base;ctx.fillRect(0,0,512,512);
+ ctx.save();ctx.translate(c,c);ctx.lineCap='round';
+ const circle=(r,color,w=2)=>{ctx.beginPath();ctx.arc(0,0,r,0,tau);ctx.strokeStyle=color;ctx.lineWidth=w;ctx.stroke();};
+ const segment=(a,r1,r2,color,w=2)=>{ctx.beginPath();ctx.moveTo(Math.cos(a)*r1,Math.sin(a)*r1);ctx.lineTo(Math.cos(a)*r2,Math.sin(a)*r2);ctx.strokeStyle=color;ctx.lineWidth=w;ctx.stroke();};
+ const rand=(()=>{let n={colosseum:15,vortex:271,tempest:917,volcano:334,eclipse:121}[name]||13;return()=>{n=(1664525*n+1013904223)>>>0;return n/4294967296}})();
+ if(name==='colosseum'){
+   // Bronze gladiatorial arena: tiled concentric stone slabs, Roman-like radial medallion.
+   for(const r of [46,94,145,188,223])circle(r,'#e5c08a',r===223?6:3);
+   for(let i=0;i<40;i++){const ang=i*tau/40;segment(ang,102,244,i%5===0?'#f6d8a2':'#4f372f',i%5===0?4:2);}
+   for(let i=0;i<8;i++){const a=i*tau/8;segment(a,15,88,'#f6dcb5',7);segment(a+.07,25,80,'#512e2e',3);}
+   circle(31,'#f8d8a6',10);circle(67,'#794738',7);
+ }else if(name==='vortex'){
+   // Spiral labyrinth that can be seen distinctly even from a distant camera.
+   for(let arm=0;arm<5;arm++){ctx.beginPath();for(let j=0;j<140;j++){const r=12+j*1.6,an=arm*tau/5+j*.052;const x=r*Math.cos(an),y=r*Math.sin(an);j?ctx.lineTo(x,y):ctx.moveTo(x,y);}ctx.strokeStyle=arm%2?'#69ddff':'#c6a5ff';ctx.lineWidth=arm%2?8:13;ctx.globalAlpha=.8;ctx.stroke();}
+   ctx.globalAlpha=1;circle(42,'#a997ff',8);circle(235,'#5ce4fb',8);
+ }else if(name==='tempest'){
+   // Triangular electric circuit grid and giant opposing lightning runes.
+   for(let i=-320;i<340;i+=44){ctx.strokeStyle='#56dff066';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(i,-260);ctx.lineTo(i+270,260);ctx.moveTo(i+270,-260);ctx.lineTo(i,260);ctx.stroke();}
+   const bolt=(cx,cy,k)=>{ctx.beginPath();ctx.moveTo(cx-26*k,cy-70*k);ctx.lineTo(cx+20*k,cy-25*k);ctx.lineTo(cx-5*k,cy+4*k);ctx.lineTo(cx+32*k,cy+6*k);ctx.lineTo(cx-25*k,cy+75*k);ctx.lineTo(cx-7*k,cy+20*k);ctx.lineTo(cx-37*k,cy+19*k);ctx.closePath();ctx.fillStyle='#c4faff';ctx.shadowColor='#45eaff';ctx.shadowBlur=10;ctx.fill();ctx.shadowBlur=0;};
+   bolt(-98,0,.75);bolt(96,0,-.75);circle(215,'#89e8ff',6);circle(64,'#e3ffff',4);
+ }else if(name==='volcano'){
+   // Wide branching lava cracks; no drawn rubble that suggests an actual collider.
+   for(let i=0;i<23;i++){const a=i*tau/23,r0=48+rand()*48;let x=Math.cos(a)*r0,y=Math.sin(a)*r0;ctx.beginPath();ctx.moveTo(x,y);for(let j=0;j<8;j++){const rad=r0+22*(j+1);const theta=a+(rand()-.5)*.24;x=Math.cos(theta)*rad;y=Math.sin(theta)*rad;ctx.lineTo(x,y);}ctx.strokeStyle='#ff7420';ctx.lineWidth=3+rand()*5;ctx.shadowColor='#ff4814';ctx.shadowBlur=13;ctx.stroke();ctx.shadowBlur=0;}
+   circle(220,'#d84a24',9);circle(42,'#ffbb51',6);
+ }else if(name==='eclipse'){
+   // Strong monochrome solar eclipse, golden orbit ticks and an offset shadow disk.
+   circle(230,'#e6bd72',11);circle(198,'#8e819f',2);
+   for(let i=0;i<48;i++){const a=i*tau/48;segment(a,i%4===0?191:209,238,i%4===0?'#ffe4a1':'#a3a6d3',i%4===0?5:2);}
+   ctx.beginPath();ctx.arc(0,0,87,0,tau);ctx.fillStyle='#ead6b6';ctx.fill();
+   ctx.beginPath();ctx.arc(28,-16,91,0,tau);ctx.fillStyle='#17182e';ctx.fill();
+   circle(110,'#f1dba0',5);circle(148,'#807baf',3);
+ }
+ // Surface microtexture adds believable roughness, but does not hide the theme art.
+ for(let i=0;i<180;i++){const a=rand()*tau,r=rand()*247;ctx.fillStyle=i%2?'#ffffff0b':'#00000018';ctx.fillRect(Math.cos(a)*r,Math.sin(a)*r,1+rand()*3,1+rand()*3);}
+ ctx.restore();const tex=new THREE.CanvasTexture(canvas);tex.colorSpace=THREE.SRGBColorSpace;
+ tex.anisotropy=Math.min(4,renderer.capabilities.getMaxAnisotropy());floorTextureCache.set(name,tex);return tex;
 }
-const arenaFloorTexture=floorTexture();
+function stageScenery(name,hot,cyan){
+ const add=(geometry,material,x,y,z)=>{const o=mesh(geometry,material,battleground);o.position.set(x,y,z);return o;};
+ const M=(color,glow=.05)=>mat(color,.62,.32,color,glow);
+ const pole=(angle,radius,height,material,rad=.22)=>{const x=Math.cos(angle)*radius,z=Math.sin(angle)*radius;return add(new THREE.CylinderGeometry(rad*.72,rad,height,9),material,x,height*.5-.32,z)};
+ // All of this architecture lives beyond the ring and the return lanes (r >= 8).
+ if(name==='colosseum'){
+  const bronze=M('#b78d62'),ivory=M('#e2c6a1'),red=M('#9c293c');
+  for(let i=0;i<12;i++){const a=(i+.5)*Math.PI/6,r=8.9;
+   pole(a,r,3.1,ivory,.31);add(new THREE.CylinderGeometry(.42,.42,.16,10),bronze,Math.cos(a)*r,2.80,Math.sin(a)*r);
+   if(i%2===0){const banner=add(new THREE.BoxGeometry(.82,1.25,.07),red,Math.cos(a)*8.38,1.85,Math.sin(a)*8.38);banner.rotation.y=-a;}}
+  add(new THREE.TorusGeometry(8.9,.12,6,96),bronze,0,2.9,0).rotation.x=Math.PI/2;
+ }else if(name==='vortex'){
+  const crystal=M('#aa8cff',.9),deep=M('#3b236b',.23);
+  for(let i=0;i<9;i++){const a=i*Math.PI*2/9,r=8.6+(i%2)*.5;
+   const o=add(new THREE.OctahedronGeometry(.40+i%3*.08,0),i%2?crystal:deep,Math.cos(a)*r,1.4+i%3*.35,Math.sin(a)*r);o.rotation.set(.35,a,.15);}
+  for(const [r,y] of [[7.55,.45],[8.25,1.55],[8.9,2.9]]){
+    const ring=add(new THREE.TorusGeometry(r,.05,7,92),M('#a77cff',.56),0,y,0);ring.rotation.x=Math.PI/2;}
+ }else if(name==='tempest'){
+   const steel=M('#607f9d'),electric=M('#5cf3ff',1.2);
+   for(let i=0;i<8;i++){const a=i*Math.PI/4,r=8.35;
+    pole(a,r,3.5,steel,.17);
+    const p=add(new THREE.OctahedronGeometry(.21,0),electric,Math.cos(a)*r,3.37,Math.sin(a)*r);p.scale.y=1.65;
+   }
+   for(let i=0;i<8;i++){const a=i*Math.PI/4+.22;
+    const arc=add(new THREE.TorusGeometry(8.0,.06,5,84,Math.PI/4),electric,0,.28,0);
+    arc.rotation.x=Math.PI/2;arc.rotation.z=a;}
+ }else if(name==='volcano'){
+   const rock=M('#1c1b21'),lava=M('#ff6425',.9);
+   for(let i=0;i<14;i++){const a=i*Math.PI*2/14,r=8.15+(i%3)*.30,h=1.2+(i%5)*.48;
+    const o=add(new THREE.ConeGeometry(.48+(i%3)*.12,h,5),rock,Math.cos(a)*r,h*.5-.4,Math.sin(a)*r);o.rotation.y=a;
+    if(i%2===0){const ember=add(new THREE.ConeGeometry(.11,.23,5),lava,Math.cos(a)*r,h-.32,Math.sin(a)*r);ember.rotation.y=a;}}
+   for(let i=0;i<7;i++){const a=i*Math.PI*2/7+.12;
+    const stream=add(new THREE.BoxGeometry(.22,.025,1.65),lava,Math.cos(a)*7.45,-.16,Math.sin(a)*7.45);stream.rotation.y=-a;}
+ }else if(name==='eclipse'){
+   const obsidian=M('#282a42'),gold=M('#ffda8a',.82);
+   for(let i=0;i<8;i++){const a=i*Math.PI/4,r=8.45,h=1.9+(i%2)*.85;
+    const p=add(new THREE.ConeGeometry(.37,h,4),obsidian,Math.cos(a)*r,h*.5-.35,Math.sin(a)*r);p.rotation.y=Math.PI/4;
+    add(new THREE.OctahedronGeometry(.12,0),gold,Math.cos(a)*r,h-.24,Math.sin(a)*r);}
+   const halo=add(new THREE.TorusGeometry(8.2,.065,7,108),gold,0,2.05,0);halo.rotation.x=Math.PI/2;
+ }
+}
+function stageLighting(name){
+ const mode=stageMood[name]||stageMood.colosseum;
+ scene.background.set(mode.sky);scene.fog.color.set(mode.fog);
+ sun.color.set(mode.acc);rimA.color.set(mode.accent);rimB.color.set(mode.acc);
+}
 let stageName='';
 function ringTube(radius,start,end,y,color,tube=.06,parent=battleground){const pts=[];for(let i=0;i<=Math.max(4,Math.round((end-start)*radius*3));i++){const a=start+(end-start)*i/Math.max(4,Math.round((end-start)*radius*3));pts.push(new THREE.Vector3(Math.cos(a)*radius,y,Math.sin(a)*radius));}const path=new THREE.CatmullRomCurve3(pts);return mesh(new THREE.TubeGeometry(path,pts.length*2,tube,6,false),mat(color,.75,.24,color,.2),parent);}
 function createStage(name){
  // Previous stages need GPU cleanup to avoid accumulating buffers on repeated room selection.
  battleground.traverse(o=>{if(o.isMesh||o.isLine){o.geometry?.dispose();const mats=Array.isArray(o.material)?o.material:[o.material];for(const m of mats)m?.dispose();}});
- battleground.clear();stageName=name;
+ battleground.clear();stageName=name;stageLighting(name);
  const [base,hot,cyan]=palette[name]||palette.colosseum;
  const pedestal=mesh(new THREE.CylinderGeometry(6.2,6.43,.58,96),mat('#0f1c2f',.68,.36),battleground);pedestal.position.y=-.42;pedestal.receiveShadow=true;
  const plate=mesh(new THREE.CylinderGeometry(5.89,6.05,.16,96),mat(base,.53,.42),battleground);plate.position.y=-.055;plate.receiveShadow=true;
+ const arenaFloorTexture=makeStageFloor(name);
  if(arenaFloorTexture){const engraved=mesh(new THREE.CircleGeometry(5.80,96),new THREE.MeshStandardMaterial({map:arenaFloorTexture,color:'#bfd4e9',metalness:.52,roughness:.36,envMapIntensity:.68,side:THREE.DoubleSide}),battleground);engraved.rotation.x=-Math.PI/2;engraved.position.y=.029;engraved.receiveShadow=true;}
  for(let r=1.0;r<5.8;r+=1.0)ringTube(r,0,Math.PI*2,.035,cyan,r>4.4?.015:.01);
  ringTube(5.85,0,Math.PI*2,-.06,hot,.14);
@@ -131,6 +217,7 @@ function createStage(name){
  }
  for(let i=0;i<48;i++){const a=i*Math.PI*2/48;const stud=mesh(new THREE.BoxGeometry(.22,.08,.5),mat('#24435e',.72,.3,cyan,.15),battleground);stud.position.set(Math.cos(a)*6.22,-.19,Math.sin(a)*6.22);stud.rotation.y=-a;}
  const middle=mesh(new THREE.CylinderGeometry(1.16,1.16,.015,40),new THREE.MeshBasicMaterial({color:hot,transparent:true,opacity:.06}),battleground);middle.position.y=.029;
+ stageScenery(name,hot,cyan);
 }
 const models=new Map(),effects=[];
 // Roster badges are independent of spinning/tilting models, so every competitor

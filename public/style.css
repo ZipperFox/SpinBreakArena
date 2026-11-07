@@ -120,3 +120,9 @@
 .arena-roster-status{display:block;white-space:nowrap;font-size:10px;line-height:1.2;color:#8fd8f2;letter-spacing:.02em}
 .arena-roster-status.warn{color:#ffba84;font-weight:700}
 @media(max-width:720px){.arena-roster-status{max-width:148px;white-space:normal;text-align:right}}
+
+/* V10.5 - sound settings never cover the battle controls on narrow screens. */
+.volume-control{display:inline-flex;align-items:center;gap:6px;color:#bdccdf;font-size:11px;white-space:nowrap}
+.volume-control input{width:80px;accent-color:#ffad68;cursor:pointer}
+@media(max-width:720px){.volume-control{font-size:0}.volume-control input{width:52px}.header-right{gap:7px}}
+@media(max-width:365px){.volume-control input{width:42px}}

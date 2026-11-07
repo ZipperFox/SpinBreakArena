@@ -16,5 +16,5 @@ assert(three.includes('THREE.PointsMaterial') && three.includes('THREE.AdditiveB
 assert(three.includes('mobile?24:46'), 'VFX mobile particle budget missing');
 assert(!three.includes('new THREE.OctahedronGeometry(.045+Math.random()'), 'Old one-mesh-per-spark implementation persists');
 assert(three.includes('glowTexture') && three.includes('userData.cyclone'));
-assert(/V10\.(?:2|3|4) · /.test(html), 'Visual HUD version marker missing');
+assert(/V10\.(?:2|3|4|5) · /.test(html), 'Visual HUD version marker missing');
 console.log('V10_2_VISUAL_UI_PASS mobileDock=true warningsClear=true sparksBatched=true anomalyVFX=true');
