@@ -15,7 +15,7 @@ const fs=require('node:fs');
  assert(client.includes('你的陀螺已淘汰')&&client.includes('找不到你自己的陀螺資料'));
  assert(server.includes('Fighter roster mismatch'));
  assert(server.includes("'.mjs':'text/javascript; charset=utf-8'"),'ES module must use JavaScript MIME for browser strict-module loading');
- assert(html.includes('/arena3d.js?v=10.6'));
+ assert(/\/arena3d\.js\?v=10\.(?:6|7)/.test(html));
  let cases=0;
  // Five arenas, four player identities, extreme angles, very narrow mobile screens,
  // rail returns, and large top jump heights.

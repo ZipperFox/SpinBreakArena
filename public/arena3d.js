@@ -1,5 +1,5 @@
 import * as THREE from './vendor/three.module.js';
-import {fitDistance, projectPoint} from './framing.mjs';
+import {fitDistance, projectPoint, visibleTopHeight} from './framing.mjs';
 // Actual WebGL 3D: dynamic rigid-body poses are broadcast from the authoritative Rapier server.
 const stage=document.getElementById('stage');
 const wrapper=document.getElementById('stageFrame');
@@ -582,6 +582,20 @@ myHalo.rotation.x=-Math.PI/2;myHalo.renderOrder=180;myMarker.add(myHalo);
 const myArrow=new THREE.Mesh(new THREE.ConeGeometry(.16,.27,5),new THREE.MeshBasicMaterial({color:'#ffffff',depthTest:false,depthWrite:false}));
 myArrow.position.y=.95;myArrow.rotation.z=Math.PI;myArrow.renderOrder=181;myMarker.add(myArrow);
 myMarker.visible=false;
+// Name and locator may remain visible even when the top is depth-occluded.
+// A local-player-only contour remains legible through the stadium geometry;
+// it never participates in the authoritative rigid-body simulation.
+const myTopSilhouette=new THREE.Group();scene.add(myTopSilhouette);
+function silhouetteMesh(geometry,color,opacity,y){
+ const m=new THREE.Mesh(geometry,new THREE.MeshBasicMaterial({color,transparent:true,opacity,side:THREE.DoubleSide,
+   depthTest:false,depthWrite:false,fog:false,toneMapped:false}));
+ m.position.y=y;m.renderOrder=210;myTopSilhouette.add(m);return m;
+}
+silhouetteMesh(new THREE.CylinderGeometry(.39,.37,.13,36),'#52eaff',.24,.045);
+silhouetteMesh(new THREE.CylinderGeometry(.15,.16,.16,24),'#ffffff',.36,.15);
+const silhouetteRim=silhouetteMesh(new THREE.TorusGeometry(.395,.027,8,48),'#7dfaff',.66,.12);
+silhouetteRim.rotation.x=Math.PI/2;
+myTopSilhouette.visible=false;
 const targetIndicator=new THREE.Group();scene.add(targetIndicator);
 const circle=mesh(new THREE.TorusGeometry(.66,.018,6,42),new THREE.MeshBasicMaterial({color:'#ffdf86',transparent:true,opacity:.9,depthTest:false}),targetIndicator);circle.rotation.x=Math.PI/2;
 const marker=mesh(new THREE.ConeGeometry(.12,.25,4),new THREE.MeshBasicMaterial({color:'#ffe8a7',depthTest:false}),targetIndicator);marker.position.y=.65;marker.rotation.z=Math.PI;
@@ -604,7 +618,7 @@ function loop(t){requestAnimationFrame(loop);const dt=Math.min(.05,Math.max(.001
      obj={group,targetP:new THREE.Vector3(),targetQ:new THREE.Quaternion(),motion:makeMotionLayer(top.color||'#6fefff'),
        badge:createFighterBadge(p,index,p.id===state.ownId?'#6af6ff':top.accent||top.color,p.id===state.ownId),lastX:0,lastZ:0};models.set(p.id,obj);}
    obj.group.visible=!!p.alive||s?.time<5; // The UI now explicitly explains an early local KO.
-   obj.targetP.set((p.x||0)/40,(p.h||0)/40,(p.y||0)/40);
+   obj.targetP.set((p.x||0)/40,visibleTopHeight(p),(p.y||0)/40);
    if(Array.isArray(p.q)){
       const q=new THREE.Quaternion(...p.q).normalize();
       const axis=Array.isArray(p.axis)?new THREE.Vector3(...p.axis).normalize():new THREE.Vector3(0,1,0).applyQuaternion(q).normalize();
@@ -624,13 +638,19 @@ function loop(t){requestAnimationFrame(loop);const dt=Math.min(.05,Math.max(.001
  const myActor=fighters.find(p=>p.id===state.ownId),myModel=models.get(state.ownId);
  myMarker.visible=!!(myActor?.alive&&myModel?.group.visible);
  if(myMarker.visible){myMarker.position.set(myModel.group.position.x,.16,myModel.group.position.z);myMarker.rotation.y=time*.4;}
+// The owner-only rotor silhouette follows the same coordinate as the physical top.
+myTopSilhouette.visible=myMarker.visible;
+if(myTopSilhouette.visible){myTopSilhouette.position.copy(myModel.group.position);myTopSilhouette.rotation.set(0,Number.isFinite(myActor?.spinPhase)?myActor.spinPhase:time*16,0);}
  window.SPINBREAK_RENDER_DIAGNOSTICS={serverFighters:fighters.length,models:models.size,
   activeModels:[...models.entries()].filter(([id,o])=>o.group.visible&&active.has(id)).map(([id])=>id),
   missingModels:fighters.filter(p=>p.alive&&!models.has(p.id)).map(p=>p.id),
   eliminated:fighters.filter(p=>!p.alive).map(p=>({id:p.id,reason:p.reason})),
   own:{id:state.ownId||null,present:!!myActor,alive:!!myActor?.alive,
        model:!!myModel,visible:!!myModel?.group.visible,
-       reason:myActor?.reason||'',x:myActor?.x,z:myActor?.y}};
+       reason:myActor?.reason||'',x:myActor?.x,z:myActor?.y,
+       rawHeight:myActor?.h,displayHeight:myActor?visibleTopHeight(myActor):null,
+       silhouette:myTopSilhouette.visible,
+       meshCount:(()=>{let n=0;myModel?.group.traverse(o=>{if(o.isMesh&&o.geometry?.attributes?.position?.count>0)n++;});return n;})()}};
  const activeTarget=models.get(state.targetId);targetIndicator.visible=!!(activeTarget&&s?.fighters?.find(x=>x.id===state.targetId)?.alive);
  if(activeTarget){targetIndicator.position.set(activeTarget.group.position.x,.4,activeTarget.group.position.z);marker.rotation.y+=dt*4;}
  const center=new THREE.Vector3(0,.5,0); // visualization only; authoritative positions stay unchanged
@@ -648,7 +668,7 @@ function loop(t){requestAnimationFrame(loop);const dt=Math.min(.05,Math.max(.001
  const requiredRadius=desired.distanceTo(center),currentRadius=cam.position.distanceTo(center);
  cam.position.lerp(desired,Math.min(1,dt*(requiredRadius>currentRadius?13:3.5)));cam.lookAt(center);
  if(myActor?.alive&&myModel){
-   const projection=projectPoint({x:myActor.x/40,y:myActor.h/40,z:myActor.y/40},
+   const projection=projectPoint({x:myActor.x/40,y:visibleTopHeight(myActor),z:myActor.y/40},
        {yaw:cameraYaw,pitch,dist:cam.position.distanceTo(center),fov:cam.fov,aspect:cam.aspect,center});
    window.SPINBREAK_RENDER_DIAGNOSTICS.own.withinFrame=projection.visible;
  }
