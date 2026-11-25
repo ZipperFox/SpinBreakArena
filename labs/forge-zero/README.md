@@ -20,3 +20,6 @@ GitHub Actions 第一次驗證 run 45616917505：npm 安裝及語法/模擬通�
 Training remains available; select a top and ratchet/bit then Start for a local four-actor match. Q charge, W skill, R guard; click opponents to target. E black hole in training. Original procedural soundtrack **Foundry Circuit** (16 bars, 132 BPM) and generated sample buffers, enable audio with a click. Not recorded audio or a separate generative music model. Match finish, spin-out/ring-out/burst, cooldowns and snapshot replay. No multiplayer migration. Browser screenshot review required.
 
 Additional polish: physically marked ring-out gates, distinct visual ratchet/bit scaling, visual wind and gravity effects, three-part burst debris, interpolated half-speed playback with recorded event effects. These are local gameplay prototypes, not a physics engine migration.
+
+## 0.5 — contact sound overhaul
+Six CC0 Kenney metal impact samples; differentiated wall and pair contacts, velocity-based tiers, voice limits and music ducking. Original Foundry Circuit remains. Preview cycles light/medium/heavy. Restrained reflections, rear mechanical panels. See src/sfx/CREDITS.md. No production multiplayer change.
