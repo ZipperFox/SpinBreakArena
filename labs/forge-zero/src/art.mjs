@@ -42,4 +42,29 @@ lathe(ratchetPart,[[.12,-.32],[.22,-.28],[.23,-.23],[.28,-.20],[.28,-.15],[.12,-
 // Non-repeating witness marks give each rotor distinct motion evidence and machining detail.
 for(let i=0;i<n;i++){let angle=i*TAU/n;arcMesh(rotor,.39,.47,angle-.055,angle+.025,.185,.009,i===0?m.brass:m.steel,.003);radialBox(rotor,.29,angle,.217,.055,.013,.018,m.black)}
 arcMesh(rotor,.095,.14,0,.65,.285,.008,m.steel,.003);
+// Distinct machined hub faces and concentric tooling marks; retain each silhouette.
+for(let r of [.126,.151,.184,.223])torus(rotor,r,.0035,m.steel,.252,48);
+if(shield){torus(rotor,.475,.027,m.dark,.105,64);torus(rotor,.488,.010,m.steel,.139,64)}else if(swept){for(let i=0;i<n;i++){let t=i*TAU/n;arcMesh(rotor,.43,.51,t-.23,t+.14,.07,.009,emissive,.003)}}else if(talon){for(let i=0;i<n;i++){let t=i*TAU/n;arcMesh(rotor,.38,.49,t-.13,t+.055,.145,.009,m.dark,.004)}}else{torus(rotor,.386,.013,m.brass,.118,64)}
 root.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true}});root.userData.rotor=rotor;root.userData.ratchet=ratchetPart;root.userData.bit=bitPart;return root}
+
+// Independent arena architectures with identical simulation boundaries and floor height.
+export const STAGES={forge:{name:'FORGE ZERO',serial:'FZ–01',color:0xffbd67,bg:0x0c1015,key:0xffd5ab,rim:0x9cdfff},void:{name:'VOID CIRCUIT',serial:'VC–02',color:0x99a7ff,bg:0x0b0e1e,key:0xb0bcff,rim:0x8a8cff},storm:{name:'STORM PIT',serial:'SP–03',color:0x8ce8e3,bg:0x0c1719,key:0xc1e1d9,rim:0x58cfc6}};
+export function buildAlternateArena(m,id){const g=new T.Group(),isVoid=id==='void',data=STAGES[id],glow=new T.MeshBasicMaterial({color:data.color,toneMapped:false}),accent=new T.MeshStandardMaterial({color:isVoid?0x3a3f66:0x3b5b59,metalness:.68,roughness:.45,map:m.map}),floorMat=new T.MeshStandardMaterial({color:isVoid?0x20273e:0x414b48,metalness:isVoid?.52:.34,roughness:.56,map:m.map});
+ const base=mesh(g,new T.CylinderGeometry(6.55,6.98,.62,isVoid?12:48),m.dark,0,-.40,0);base.receiveShadow=true;let floor=mesh(g,new T.CylinderGeometry(5.6,5.6,.17,112),floorMat,0,-.095,0);floor.receiveShadow=true;
+ if(isVoid){
+ // Recessed radial circuit board pattern, hexagonal hub, six massive exterior docking arms.
+ const hub=mesh(g,new T.CylinderGeometry(1.36,1.36,.018,6),accent,0,.004,0);hub.receiveShadow=true;
+ for(let i=0;i<6;i++){let ang=TAU*i/6;arcMesh(g,1.46,5.47,ang+.028,ang+TAU/6-.028,-.01,.016,i%2?accent:floorMat,.003);for(let j=0;j<3;j++){let t=ang+.13+j*.27;radialBox(g,3.6,t,.012,3.2,.008,.035,glow)}arcMesh(g,5.67,6.19,ang+.12,ang+TAU/6-.12,.015,.14,m.dark,.03);arcMesh(g,5.78,5.86,ang+.17,ang+TAU/6-.17,.16,.025,glow,.006);radialBox(g,7.3,ang+.52,-.34,2.6,.55,1.05,m.dark);radialBox(g,7.9,ang+.52,-.02,1.5,.09,.68,accent);}
+ for(let r of [1.55,2.6,4.55,5.32]){torus(g,r,.012,glow,.017,96);}
+ for(let i=0;i<5;i++){let ang=Math.PI+.31+i*.62;let x=Math.cos(ang)*9.2,z=Math.sin(ang)*9.2;let p=mesh(g,new T.CylinderGeometry(.37,.77,2.55,6),m.dark,x,.45,z);p.castShadow=true;mesh(g,new T.OctahedronGeometry(.43),accent,x,1.95,z);mesh(g,new T.OctahedronGeometry(.22),glow,x,1.95,z);arcMesh(g,9.05,9.36,ang-.23,ang+.23,2.15,.08,glow,.01)}
+ }else{
+ // Heavy circular concrete-like deck, broad ribbed tread lanes and turbine columns.
+ for(let i=0;i<10;i++){let ang=TAU*i/10;let panel=arcMesh(g,1.78,5.49,ang+.02,ang+TAU/10-.02,-.018,.02,i%2?floorMat:accent,.007);panel.receiveShadow=true;for(let j=0;j<5;j++)radialBox(g,3.4+j*.40,ang+.29,.01,.035,.008,.48,m.dark);arcMesh(g,5.68,6.11,ang+.04,ang+TAU/10-.04,.013,.19,m.steel,.028);arcMesh(g,6.2,6.43,ang+.09,ang+TAU/10-.09,.05,.23,m.dark,.035);}
+ const hub=mesh(g,new T.CylinderGeometry(1.67,1.67,.015,32),m.dark,0,.001,0);hub.receiveShadow=true;
+ for(let i=0;i<8;i++){let ang=i*TAU/8;arcMesh(g,4.65,4.72,ang+.11,ang+.63,.015,.009,glow,0);radialBox(g,7.35,ang,-.34,1.2,.38,.85,accent);}
+ for(let i=0;i<4;i++){let ang=Math.PI+.32+i*.83,x=Math.cos(ang)*9,z=Math.sin(ang)*9;mesh(g,new T.CylinderGeometry(.7,.92,2.9,12),m.dark,x,.55,z);mesh(g,new T.CylinderGeometry(.78,.78,.12,24),m.steel,x,2.05,z);mesh(g,new T.CylinderGeometry(.62,.62,.16,24),glow,x,2.15,z);for(let j=0;j<4;j++){let ang2=j*TAU/4;let b=mesh(g,new T.BoxGeometry(.16,1.6,.16),m.steel,x+.72*Math.cos(ang2),.65,z+.72*Math.sin(ang2));b.castShadow=true;}}
+ }
+ for(let ang of [Math.PI/2,3*Math.PI/2]){arcMesh(g,5.03,5.29,ang-.255,ang+.255,.012,.014,m.brass,.004);for(let j=-2;j<=2;j++)radialBox(g,5.16,ang+j*.085,.034,.17,.013,.09,m.black)}
+ const serial=mesh(g,new T.PlaneGeometry(2.1,.525),new T.MeshBasicMaterial({map:labelTexture(data.serial),transparent:true,depthWrite:false,opacity:.85}),0,.036,3.65);serial.rotation.x=-Math.PI/2;
+ const deck=mesh(g,new T.CylinderGeometry(13,13,.28,isVoid?12:64),m.black,0,-1,0);deck.receiveShadow=true;return g;
+}

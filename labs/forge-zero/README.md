@@ -23,3 +23,6 @@ Additional polish: physically marked ring-out gates, distinct visual ratchet/bit
 
 ## 0.5 — contact sound overhaul
 Six CC0 Kenney metal impact samples; differentiated wall and pair contacts, velocity-based tiers, voice limits and music ducking. Original Foundry Circuit remains. Preview cycles light/medium/heavy. Restrained reflections, rear mechanical panels. See src/sfx/CREDITS.md. No production multiplayer change.
+
+## 0.6 — combat visuals and three arenas
+Independent Forge / Void / Storm architectures use identical battle boundaries. Reusable shader shockwaves, contact flash sprites, instanced debris, charge aura, guard shield and enhanced accretion disk. Rotor tooling details and exposure streaks. Browser captures cover additional stages and guard. Existing 0.5 audio and local simulation are retained; no multiplayer or mobile hardware performance claim.

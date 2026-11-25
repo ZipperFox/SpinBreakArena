@@ -1,11 +1,11 @@
 {
   "name": "forge-zero-visual-lab",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
-    "check": "node --check src/main.mjs && node --check src/art.mjs && node --check src/battle.mjs && node --check src/audio.mjs",
+    "check": "node --check src/main.mjs && node --check src/art.mjs && node --check src/battle.mjs && node --check src/audio.mjs && node --check src/combat-visuals.mjs",
     "capture": "node scripts/capture.mjs"
   },
   "dependencies": {

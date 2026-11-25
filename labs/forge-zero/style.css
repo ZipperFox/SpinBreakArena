@@ -5,3 +5,5 @@
 #roster .integrity{display:block;height:2px;background:#394149;overflow:hidden}#roster .integrity i{display:block;height:100%;width:100%;background:#d7b994}#roster .meter{margin-top:1px}
 
 #audioStatus{font-size:10px;letter-spacing:.2px;color:#b8c7cb}#previewSound{border-color:#526971}#previewSound:hover{border-color:var(--amber)}
+
+#arenaSelect{max-width:100%;border-color:#6b614f}#stageName{color:#e0c7a0}.setup label:has(#arenaSelect){max-width:100%}@media(max-width:600px){#arenaSelect{max-width:235px;font-size:11px}}
