@@ -15,3 +15,6 @@
 初次候選實作，尚未取得有效 Three.js 渲染。環境 DNS 無法下載 npm 套件，Chromium 訪問 localhost 回報 ERR_BLOCKED_BY_ADMINISTRATOR。因此尚未證明任何美術品質或手機 FPS。原版本未修改。尚未加入音效或正式多人系統，亦未把低護欄示範當成正式碰撞形狀。研究紀錄見 `RESEARCH.md`。
 
 GitHub Actions 第一次驗證 run 45616917505：npm 安裝及語法/模擬通過，Playwright 1.56.1 不支援 ubuntu-latest 實際使用的 Ubuntu 26.04；已將實驗 workflow 固定至 Ubuntu 24.04。未把 CI 安裝成功視為畫面驗收。
+
+## 0.4 battle prototype
+Training remains available; select a top and ratchet/bit then Start for a local four-actor match. Q charge, W skill, R guard; click opponents to target. E black hole in training. Original procedural soundtrack **Foundry Circuit** (16 bars, 132 BPM) and generated sample buffers, enable audio with a click. Not recorded audio or a separate generative music model. Match finish, spin-out/ring-out/burst, cooldowns and snapshot replay. No multiplayer migration. Browser screenshot review required.
