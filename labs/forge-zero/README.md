@@ -1,0 +1,15 @@
+# FORGE ZERO — Visual Lab 0.1 (candidate)
+
+獨立的 Three.js r180 視覺實驗，與正式 SPIN//BREAK ARENA V10.7 的伺服器、Rapier 物理、多人連線和部署完全隔離。四陀螺的展示模擬不是正式遊戲物理。
+
+## 啟動（Windows）
+解壓後執行 `START_WINDOWS.cmd`（首次需要網路下載 Three.js；Node.js 22+）。或在資料夾執行 `npm install --omit=dev`、`npm start`，瀏覽 http://127.0.0.1:5177。沒有外部 CDN 或線上模型依賴。選陀螺、衝鋒 Q、重擊 W、黑洞 E、暫停 Space、重置，另有四種鏡頭。低畫質關閉後製及即時陰影，保留接觸陰影。
+
+## 開發與驗證
+- `npm run check`：語法。
+- `node scripts/test-battle.mjs`：四陀螺簡化模擬。
+- `npm install`、`npx playwright install chromium`、`npm run capture`：真正的桌面及手機尺寸 Chromium 渲染、四陀螺特寫、事件截圖；只建立技術結果，仍需要人或具視覺能力的代理開圖驗收。
+- `captures/` 保存實際執行紀錄；若為阻擋截圖，絕非遊戲渲染成果。
+
+## 狀態
+初次候選實作，尚未取得有效 Three.js 渲染。環境 DNS 無法下載 npm 套件，Chromium 訪問 localhost 回報 ERR_BLOCKED_BY_ADMINISTRATOR。因此尚未證明任何美術品質或手機 FPS。原版本未修改。尚未加入音效或正式多人系統，亦未把低護欄示範當成正式碰撞形狀。研究紀錄見 `RESEARCH.md`。
