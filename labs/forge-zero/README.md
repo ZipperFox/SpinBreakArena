@@ -29,3 +29,6 @@ Independent Forge / Void / Storm architectures use identical battle boundaries. 
 
 ## 0.7 — rotor dynamics experiment
 240 Hz fixed-step scaled planar solver: bowl gradient, angular kinetic energy, normal/tangent impulses and rail acceleration. Pure rules disable magic and anomalies; three launch modes. Shared curved floor. This is not calibrated 3D dynamics or Rapier. Production multiplayer unchanged.
+
+## 0.8 — Mechanical rebuild
+Four actual assembly groups, 108 local configurations, mass/inertia/COM approximation, core modifiers, garage orbit and animated exploded view. Read `ANATOMY_RESEARCH.md`. Technical and visual gates separate; local game remains single-player.

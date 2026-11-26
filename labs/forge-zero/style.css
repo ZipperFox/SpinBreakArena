@@ -9,3 +9,5 @@
 #arenaSelect{max-width:100%;border-color:#6b614f}#stageName{color:#e0c7a0}.setup label:has(#arenaSelect){max-width:100%}@media(max-width:600px){#arenaSelect{max-width:235px;font-size:11px}}
 
 #speedReadout{font-size:10px;font-variant-numeric:tabular-nums;color:#e7bb78}@media(max-width:700px){#speedReadout{display:none}}
+
+.spec-readout{font:11px/1.6 ui-monospace,monospace;color:#c6cbd0;border-bottom:1px solid #343b40;padding:9px 4px}.garage-notice{color:#e0bd82}#canvas{touch-action:pan-y}#viewport:has(.garage-notice) #canvas{touch-action:none}#explodeBtn{border-color:#8f8066}@media(max-width:600px){.spec-readout{font-size:10px}}

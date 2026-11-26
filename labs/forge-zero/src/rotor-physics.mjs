@@ -20,10 +20,10 @@ export function integrate(a,dt,anomaly,t,match){let r=Math.max(.0001,Math.hypot(
  let fx=-nx*g-a.vx*drag-a.vz*curve,fz=-nz*g-a.vz*drag+a.vx*curve;
  if(anomaly==='hole'){fx-=nx*15;fz-=nz*15}else if(anomaly==='wind'){fx+=Math.cos(t*1.7)*8;fz+=Math.sin(t*1.7)*8}else if(anomaly==='shock'){fx+=nx*10;fz+=nz*10}
  a.vx+=fx*dt;a.vz+=fz*dt;a.x+=a.vx*dt;a.z+=a.vz*dt;
- if(match)drain(a,.5*a.inertia*a.initialOmega*a.initialOmega*(.012+.012*(speed/15)**2+.10*a.wobble*a.wobble)*dt/a.stamina);
+ if(match)drain(a,.5*a.inertia*a.initialOmega*a.initialOmega*(.012+.012*(speed/15)**2+.10*a.wobble*a.wobble)*dt/a.stamina*(a.spinDrain||1));
  else a.omega+= (a.initialOmega-a.omega)*Math.min(1,dt*1.8);
  a.wobble*=Math.exp(-dt*(1+ratio*4));a.precession=(a.precession+dt*(2.8+10*(1-ratio)))%TAU;
- let wobble=clamp((1-ratio)**3*1.05+a.wobble,0,1.12),lean=Math.min(.18,speed*.007);
+ let wobble=clamp((1-ratio)**3*1.05/(a.stability||1)+a.wobble,0,1.12),lean=Math.min(.18,speed*.007);
  a.leanX=Math.sin(a.precession)*wobble+a.vz*lean/Math.max(1,speed);a.leanZ=Math.cos(a.precession)*wobble-a.vx*lean/Math.max(1,speed);a.tilt=Math.hypot(a.leanX,a.leanZ);a.spin=(a.spin+a.omega*dt)%TAU;
 }
 export function railDash(a){let r=Math.hypot(a.x,a.z);if(r<RAIL||a.railCd>0||Math.abs(a.omega)/a.initialOmega<.23)return 0;let nx=a.x/r,nz=a.z/r,rad=a.vx*nx+a.vz*nz,tan=-a.vx*nz+a.vz*nx;if(Math.abs(nz)>.94||rad<1||Math.abs(tan)<2)return 0;let s=Math.sign(tan),v=accelerate(a,-nz*s*.94-nx*.34,nx*s*.94-nz*.34,Math.min(34,(19+11*Math.abs(a.omega)/a.initialOmega)*a.railFactor));a.railCd=1.15;a.rail=.38;a.charge=Math.max(a.charge,.3);return v}

@@ -1,4 +1,4 @@
-import * as T from 'three';import {surfaceHeight} from './rotor-physics.mjs';
+import * as T from 'three';import {makeMechanicalTop} from './mechanical-top.mjs';import {surfaceHeight} from './rotor-physics.mjs';
 const TAU=Math.PI*2;
 const rng=seed=>()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296};
 export const mesh=(parent,geometry,material,x=0,y=0,z=0)=>{const m=new T.Mesh(geometry,material);m.position.set(x,y,z);parent.add(m);return m};
@@ -34,18 +34,7 @@ for(let i=0;i<4;i++){let a=Math.PI+i*Math.PI/5,b=a+Math.PI/5;arcMesh(g,9.1,9.48,
 for(let i=0;i<12;i++){let angle=Math.PI+(i+.5)*Math.PI/12;arcMesh(g,9.75,10.1,angle-.108,angle+.108,-.45,2.45,m.black,.035);arcMesh(g,9.68,9.74,angle-.097,angle+.097,1.85,.04,m.brass,.009);for(let j=0;j<3;j++)radialBox(g,9.56,angle,.18+j*.46,.13,.18,.64,m.dark);}
 for(let i=0;i<8;i++){let angle=i*TAU/8+.393;arcMesh(g,7.35,7.48,angle-.20,angle+.20,-.68,.025,m.steel,.004);radialBox(g,7.62,angle,-.72,.19,.04,.76,m.dimLight);}
 return g}
-export function buildTop(type,m,high=true){const root=new T.Group(),rotor=new T.Group(),ratchetPart=new T.Group(),bitPart=new T.Group();root.add(rotor);rotor.add(ratchetPart,bitPart);const colored=new T.MeshPhysicalMaterial({color:type.color,metalness:.76,roughness:.34,map:m.map,clearcoat:high?.22:0,clearcoatRoughness:.22,envMapIntensity:1.05});const emissive=new T.MeshStandardMaterial({color:type.accent,metalness:.4,roughness:.29,emissive:type.accent,emissiveIntensity:.3});let shield=type.shape==='shield',swept=type.shape==='swept',talon=type.shape==='talon';const n=shield?8:swept?5:talon?3:6;
-lathe(rotor,[[.18,-.20],[.26,-.17],[.31,-.10],[.39,-.07],[.41,.04],[.34,.095],[.26,.115],[.17,.115]],m.dark);lathe(rotor,[[.17,.095],[.29,.11],[.30,.16],[.26,.20],[.19,.23],[.14,.23]],m.steel);lathe(rotor,[[.14,.22],[.16,.24],[.13,.275],[0,.285]],colored);torus(rotor,.168,.014,m.brass,.237);torus(rotor,.305,.018,m.steel,.12);
-// Independent silhouettes: asymmetric talons, armored ring, thin swept turbine and balanced petals.
-for(let i=0;i<n;i++){let a=i*TAU/n,span=TAU/n;const s=new T.Shape();let points;if(talon)points=[[.25,-.36],[.40,-.42],[.56,-.18],[.63,.10],[.48,.34],[.38,.42],[.27,.24]];else if(shield)points=[[.30,-.40],[.48,-.41],[.55,-.25],[.55,.25],[.48,.41],[.30,.40]];else if(swept)points=[[.25,-.44],[.44,-.41],[.60,-.20],[.50,.30],[.36,.50],[.29,.18]];else points=[[.25,-.40],[.43,-.42],[.53,-.20],[.56,.02],[.52,.28],[.39,.42],[.26,.38]];points.forEach(([r,off],j)=>{let t=a+off*span,x=r*Math.cos(t),z=r*Math.sin(t);j?s.lineTo(x,z):s.moveTo(x,z)});s.closePath();const g=new T.ExtrudeGeometry(s,{depth:shield?.15:swept?.075:.11,steps:1,bevelEnabled:true,bevelThickness:.018,bevelSize:.018,bevelSegments:2});let blade=mesh(rotor,g,[m.steel,colored],0,-.035,0);blade.rotation.x=-Math.PI/2;let insert=arcMesh(rotor,.32,shield?.47:.44,a-.28*span,a+.18*span,shield?.133:.096,.038,colored,.012);let bolt=mesh(rotor,new T.CylinderGeometry(.026,.026,.012,6),m.dark,.34*Math.cos(a),.154,.34*Math.sin(a));let line=arcMesh(rotor,.195,.207,a-.26*span,a+.18*span,.25,.005,emissive,0);}
-lathe(ratchetPart,[[.12,-.32],[.22,-.28],[.23,-.23],[.28,-.20],[.28,-.15],[.12,-.15]],colored);for(let i=0;i<(shield?9:6);i++){let a=i*TAU/(shield?9:6);radialBox(ratchetPart,.23,a,-.22,.095,.08,.07,m.steel)}lathe(bitPart,[[.075,-.38],[.10,-.36],[.13,-.31],[.12,-.28],[0,-.28]],m.steel);lathe(bitPart,[[0,-.46],[shield?.10:swept?.042:.07,-.44],[.11,-.40],[.10,-.36],[0,-.36]],shield?m.rubber:m.steel);
-// Non-repeating witness marks give each rotor distinct motion evidence and machining detail.
-for(let i=0;i<n;i++){let angle=i*TAU/n;arcMesh(rotor,.39,.47,angle-.055,angle+.025,.185,.009,i===0?m.brass:m.steel,.003);radialBox(rotor,.29,angle,.217,.055,.013,.018,m.black)}
-arcMesh(rotor,.095,.14,0,.65,.285,.008,m.steel,.003);
-// Distinct machined hub faces and concentric tooling marks; retain each silhouette.
-for(let r of [.126,.151,.184,.223])torus(rotor,r,.0035,m.steel,.252,48);
-if(shield){torus(rotor,.475,.027,m.dark,.105,64);torus(rotor,.488,.010,m.steel,.139,64)}else if(swept){for(let i=0;i<n;i++){let t=i*TAU/n;arcMesh(rotor,.43,.51,t-.23,t+.14,.07,.009,emissive,.003)}}else if(talon){for(let i=0;i<n;i++){let t=i*TAU/n;arcMesh(rotor,.38,.49,t-.13,t+.055,.145,.009,m.dark,.004)}}else{torus(rotor,.386,.013,m.brass,.118,64)}
-root.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true}});root.userData.rotor=rotor;root.userData.ratchet=ratchetPart;root.userData.bit=bitPart;return root}
+export function buildTop(type,m,high=true,build={}){return makeMechanicalTop(T,type,build,{high,shadows:high})}
 
 // Independent arena architectures with identical simulation boundaries and floor height.
 export const STAGES={forge:{name:'FORGE ZERO',serial:'FZ–01',color:0xffbd67,bg:0x0c1015,key:0xffd5ab,rim:0x9cdfff},void:{name:'VOID CIRCUIT',serial:'VC–02',color:0x99a7ff,bg:0x0b0e1e,key:0xb0bcff,rim:0x8a8cff},storm:{name:'STORM PIT',serial:'SP–03',color:0x8ce8e3,bg:0x0c1719,key:0xc1e1d9,rim:0x58cfc6}};
