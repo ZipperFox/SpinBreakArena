@@ -8,7 +8,7 @@ for(const id of ['graphicsQuality','graphicsFps'])assert(html.includes(`id="${id
 for(const val of ['auto','low','medium','high'])assert(html.includes(`value="${val}"`));
 assert(/V10\.\d+ · /.test(html));
 assert(css.includes('.graphics-select-label'));
-for(const feature of ['PMREMGenerator','MeshPhysicalMaterial','makeStageFloor','makeMotionLayer','updateMotionLayer','groundShadowMap','applyGraphicsProfile','graphics.ratio','impactFocus','qualityChoice'])assert(js.includes(feature),feature);
+for(const feature of ['PMREMGenerator','MeshPhysicalMaterial','makeStageFloor','makeMotionLayer','updateMotionLayer','groundShadowMap','applyGraphicsProfile','graphics.ratio','impactFocus','qualityChoice'])assert((feature==='MeshPhysicalMaterial'?fs.readFileSync('public/mechanical-top.mjs','utf8'):js).includes(feature),feature);
 assert(js.includes('const source=()=>window.SPINBREAK_3D_BRIDGE'), 'Must use authoritative snapshots');
 assert(!js.includes('applyImpulse(') && !js.includes('world.step('),'Renderer must not simulate gameplay physics');
 assert(js.includes("graphics.level==='low'") && js.includes('fps<(mobile?39:46)'), 'Mobile performance controls must remain active');
