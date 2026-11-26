@@ -9,7 +9,7 @@ export function makeMechanicalTop(T,type,build={},options={}){
  const mat=(color,metalness,roughness,extra={})=>{let m=new T.MeshPhysicalMaterial({color,metalness,roughness,envMapIntensity:1.0,...extra});materials.push(m);return m};
  const cut=mat(0xc6c9ca,.97,.29,{anisotropy:high?.42:0}),cast=mat(0x596168,.91,.43),dark=mat(0x202a30,.73,.46),anod=mat(paint,.77,.37,{clearcoat:high?.16:0}),poly=mat(paint,.10,.46,{clearcoat:.22}),black=mat(0x10161a,.08,.79),accentMat=mat(accent,.68,.40),weightMat=mat(s.core==='tungsten'?0x89817a:0x989fa4,.91,.40),carbon=mat(0x222b32,.22,.59);
  function mesh(g,geo,m,x=0,y=0,z=0){let o=new T.Mesh(geo,m);o.position.set(x,y,z);o.castShadow=options.shadows!==false;o.receiveShadow=true;g.add(o);return o}
- function lathe(g,profile,m,segs=high?64:40){return mesh(g,new T.LatheGeometry(profile.map(p=>new T.Vector2(...p)),segs),m)}
+ function lathe(g,profile,m,segs=high?64:40){return mesh(g,new T.LatheGeometry((profile[0][1]>profile.at(-1)[1]?profile.slice().reverse():profile).map(p=>new T.Vector2(...p)),segs),m)}
  // Closed profiled annulus: continuous outer wall, machined chamfers, top land and actual inner bore.
  function annulus(g,levels,m,rad=s.radiusAt,segments=high?144:84){const pos=[],idx=[],uv=[],n=levels.length;
  for(let j=0;j<n;j++){let [y,f,absolute]=levels[j];for(let i=0;i<=segments;i++){let a=i*TAU/segments,r=absolute??rad(a)*f;pos.push(Math.cos(a)*r,y,Math.sin(a)*r);uv.push(i/segments,j/(n-1))}}
@@ -39,7 +39,7 @@ export function makeMechanicalTop(T,type,build={},options={}){
  circular(core,.187,.197,.213,dark,.162);
  for(let i=0;i<6;i++){let t=i*TAU/6;bolt(core,.147,.253,t,.72)}
  // A single non-symmetrical witness mark plus an annular serial band; not a separate glow decoration.
- let marker=inset(core,.18,.42,.068,.133,.286,.007,accentMat);marker.name='rotation witness';
+ if(s.core==='tungsten'){circular(core,.184,.168,.193,weightMat,.166)}else if(s.core==='carbon'){for(let i=0;i<6;i++)inset(core,i*TAU/6,.42,.09,.142,.275,.009,black)}let marker=inset(core,.18,.42,.068,.133,.286,.007,accentMat);marker.name='rotation witness';
  let m0=mesh(core,new T.CylinderGeometry(.062,.062,.008,high?32:20),black,0,.289,0);m0.name='launcher socket';
  circular(weight,s.ringRadius,-.217,-.079,weightMat,.135);
  circular(weight,s.ringRadius*.91,-.231,-.202,dark,.13);

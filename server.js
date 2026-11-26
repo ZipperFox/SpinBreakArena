@@ -37,6 +37,7 @@ for(const top of TOPS)top.blade=BLADE_FORMS[top.id];
 const TOP_BY_ID = Object.fromEntries(TOPS.map(x => [x.id, x]));
 // Original fantasy parts: inspired by the real three-layer customization principle, not licensed toy parts.
 const PARTS = {
+ cores:[{id:'alloy',code:'AL',name:'合金標準',mass:.20,radius:.176,y:.178,stability:1,drain:1,drive:1,armor:1,desc:'標準鎖定核心'},{id:'tungsten',code:'TG',name:'高密度配重',mass:.34,radius:.164,y:.155,stability:1.17,drain:.91,drive:.90,armor:1.17,desc:'較重，穩定與持久'},{id:'carbon',code:'CF',name:'碳纖輕量',mass:.105,radius:.185,y:.195,stability:.90,drain:1.07,drive:1.12,armor:.89,desc:'輕量加速，抗撞較低'}],
  ratchets: [
   {id:'low3',name:'三翼低重心',code:'3-L',mass:-.07,stability:.10,recoil:.06,drag:0,gear:3,desc:'輕快，低重心，容易控制'},
   {id:'heavy5',name:'五爪鋼輪',code:'5-H',mass:.18,stability:.02,recoil:.04,drag:.025,gear:5,desc:'重量衝擊，機動較低'},
@@ -58,9 +59,10 @@ const PARTS = {
 };
 const RAT = Object.fromEntries(PARTS.ratchets.map(p=>[p.id,p]));
 const BIT = Object.fromEntries(PARTS.bits.map(p=>[p.id,p]));
-const DEFAULT_BUILD={ratchet:'wide7',bit:'taper'};
+const CORE=Object.fromEntries(PARTS.cores.map(p=>[p.id,p]));
+const DEFAULT_BUILD={ratchet:'wide7',bit:'taper',core:'alloy'};
 const hexColor=v=>typeof v==='string'&&/^#[a-f0-9]{6}$/i.test(v)?v.toLowerCase():null;
-const validBuild=b=>({ratchet:RAT[b?.ratchet]?b.ratchet:DEFAULT_BUILD.ratchet,bit:BIT[b?.bit]?b.bit:DEFAULT_BUILD.bit,paint:hexColor(b?.paint)});
+const validBuild=b=>({ratchet:RAT[b?.ratchet]?b.ratchet:DEFAULT_BUILD.ratchet,bit:BIT[b?.bit]?b.bit:DEFAULT_BUILD.bit,core:CORE[b?.core]?b.core:DEFAULT_BUILD.core,paint:hexColor(b?.paint)});
 const validLaunch=o=>({angle:clamp(Number.isFinite(Number(o?.angle))?Number(o.angle):0,-40,40),power:clamp(Number.isFinite(Number(o?.power))?Number(o.power):85,55,100),lane:[-1,0,1].includes(Number(o?.lane))?Number(o.lane):0});
 const buildCode=b=>RAT[b.ratchet].code+' / '+BIT[b.bit].code;
 const partStats=p=>{const rat=RAT[p.build?.ratchet]||RAT.wide7,bit=BIT[p.build?.bit]||BIT.taper;return {rat,bit,mass:clamp(1+rat.mass,.78,1.23),drive:bit.drive,control:bit.control,spinDrain:bit.spinDrain,grip:bit.grip,rail:bit.rail,stability:rat.stability,recoil:rat.recoil};};
@@ -218,7 +220,7 @@ function parseFrames(ws,chunk){ws.buffer=Buffer.concat([ws.buffer,chunk]);if(ws.
  } }
 const mime={'.webmanifest':'application/manifest+json','.png':'image/png','.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.ico':'image/x-icon','.wav':'audio/wav'};
 const server=http.createServer((req,res)=>{
-  if(req.url==='/health'){res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({ok:true,game:'spin-break-arena',version:'10.6',physics:'rapier3d',rooms:rooms.size,uptime:Math.round(process.uptime())}));return;}
+  if(req.url==='/health'){res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({ok:true,game:'spin-break-arena',version:'10.8',physics:'rapier3d',rooms:rooms.size,uptime:Math.round(process.uptime())}));return;}
   if(req.method!=='GET'&&req.method!=='HEAD'){res.writeHead(405);res.end('Method not allowed');return;}
   let uri;try{uri=decodeURIComponent((req.url||'/').split('?')[0]);}catch{res.writeHead(400);res.end('Invalid path');return;}const file=path.resolve(ROOT,'.'+(uri==='/'?'/index.html':uri));
   if(!file.startsWith(ROOT+path.sep)){res.writeHead(403);res.end();return;}

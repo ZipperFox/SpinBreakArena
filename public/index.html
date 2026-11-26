@@ -12,17 +12,17 @@
   <meta name="description" content="SPIN//BREAK ARENA：免費的即時多人戰鬥陀螺競技遊戲，12 款陀螺、5 大競技場、必殺技與房間對戰。" />
   <title>SPIN//BREAK ARENA | 戰鬥陀螺競技場</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-  <link rel="stylesheet" href="/style.css?v=10.7" />
-  <script src="/sync.js?v=10.7" defer></script>
-  <script src="/audio.js?v=10.7" defer></script>
-  <script src="/client.js?v=10.7" defer></script>
-  <script type="module" src="/arena3d.js?v=10.7"></script>
+  <link rel="stylesheet" href="/style.css?v=10.8" />
+  <script src="/sync.js?v=10.8" defer></script>
+  <script src="/audio.js?v=10.8" defer></script>
+  <script src="/client.js?v=10.8" defer></script>
+  <script type="module" src="/arena3d.js?v=10.8"></script>
 </head>
 <body>
   <div class="background-fx" aria-hidden="true"></div>
   <header class="site-header">
     <div class="brand"><div class="brand-mark"><span class="mark-disc"></span><span class="mark-core"></span></div><div><div class="brand-title">SPIN<span>//</span>BREAK</div><div class="brand-sub">ARENA · 次世代陀螺競技</div></div></div>
-    <div class="header-right"><div class="live-tag"><span class="live-dot" id="netDot"></span><span id="netState">正在連線</span></div><label class="graphics-select-label" for="graphicsQuality">畫質 <select id="graphicsQuality" aria-label="遊戲畫質"><option value="auto">自動</option><option value="low">流暢</option><option value="medium">標準</option><option value="high">精緻</option></select></label><span id="graphicsFps" class="graphics-fps" aria-live="off">— FPS</span><label class="volume-control" title="音效音量">音量 <input id="effectsVolume" type="range" min="0" max="100" step="5" value="50" aria-label="音效音量"></label><button id="btnSound" class="icon-btn" title="開啟或關閉戰鬥音效（無背景循環音樂）">♫ <span id="soundText">音效關</span></button><span class="version">V10.7 · FIVE WORLDS & SFX</span></div>
+    <div class="header-right"><div class="live-tag"><span class="live-dot" id="netDot"></span><span id="netState">正在連線</span></div><label class="graphics-select-label" for="graphicsQuality">畫質 <select id="graphicsQuality" aria-label="遊戲畫質"><option value="auto">自動</option><option value="low">流暢</option><option value="medium">標準</option><option value="high">精緻</option></select></label><span id="graphicsFps" class="graphics-fps" aria-live="off">— FPS</span><label class="volume-control" title="音效音量">音量 <input id="effectsVolume" type="range" min="0" max="100" step="5" value="50" aria-label="音效音量"></label><button id="btnSound" class="icon-btn" title="開啟或關閉戰鬥音效（無背景循環音樂）">♫ <span id="soundText">音效關</span></button><span class="version">V10.8 · MECHANICAL REBUILD</span></div>
   </header>
   <div class="marquee"><div class="marquee-inner"><span>IGNITE YOUR SPIRIT <b>✦</b> 超越極限的碰撞 <b>✦</b> 576 種物理改造組合 <b>✦</b> 5 大決戰舞台 <b>✦</b> <strong>LET IT RIP</strong> <b>✦</b> 引爆你的鬥志 <b>✦</b> </span><span aria-hidden="true">IGNITE YOUR SPIRIT <b>✦</b> 超越極限的碰撞 <b>✦</b> 576 種物理改造組合 <b>✦</b> 5 大決戰舞台 <b>✦</b> <strong>LET IT RIP</strong> <b>✦</b> 引爆你的鬥志 <b>✦</b> </span></div></div>
   <main class="layout">
@@ -59,11 +59,12 @@
         <div class="panel-kicker">PLAYER IDENTITY / 玩家資訊</div>
         <label class="field-label" for="playerName">暱稱</label><input id="playerName" maxlength="16" autocomplete="off" value="挑戰者" placeholder="輸入你的戰鬥名稱" />
         <div class="customize-panel"><div class="panel-kicker">V9 · CUSTOM GARAGE / 3D 零件車庫 · 576 種組合</div>
-          <canvas id="garage3d" class="garage-3d" width="500" height="280" aria-label="3D 零件爆炸視圖，可檢查不同刀刃形狀"></canvas>
+          <canvas id="garage3d" class="garage-3d" width="500" height="280" aria-label="3D 陀螺機械工坊，拖曳觀察"></canvas><div class="garage-tools"><button type="button" id="garageExplode">拆解</button><small>拖曳旋轉 · 攻擊環／配重環／核心／軸尖</small></div>
           <div class="garage-hint">3D 爆炸視圖｜刀刃、棘輪、軸心逐層組裝</div>
           <label for="bladeSelect" class="field-label">① 刀刃 Blade · 撞擊形狀</label><select id="bladeSelect"></select>
           <label for="ratchetSelect" class="field-label">② 棘輪 Ratchet · 重量與重心</label><select id="ratchetSelect"></select>
-          <label for="bitSelect" class="field-label">③ 軸心 Bit · 移動／抓地／軌道</label><select id="bitSelect"></select>
+          <label for="coreSelect" class="field-label">③ 核心 Core · 轉動慣量與穩定</label><select id="coreSelect"></select>
+          <label for="bitSelect" class="field-label">④ 軸心 Bit · 移動／抓地／軌道</label><select id="bitSelect"></select>
           <label class="field-label" for="paintSelect">④ 陀螺主色塗裝 Paint</label>
           <div class="paint-row"><input id="paintSelect" type="color" value="#ff613f" aria-label="選擇主色"/><button id="paintReset" type="button" class="secondary-btn">恢復原色</button></div>
           <div id="buildInfo" class="build-info">正在載入改造零件…</div>

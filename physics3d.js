@@ -40,8 +40,9 @@ function makeEngine(tops,parts,callbacks){
  const topBy=Object.fromEntries(tops.map(t=>[t.id,t]));
  const rats=Object.fromEntries(parts.ratchets.map(t=>[t.id,t]));
  const bits=Object.fromEntries(parts.bits.map(t=>[t.id,t]));
- const getParts=p=>({rat:rats[p.build?.ratchet]||rats.wide7,bit:bits[p.build?.bit]||bits.taper});
- const stats=p=>{const t=topBy[p.top],{rat,bit}=getParts(p);return {mass:clamp((1+(t.d-5)*.073+(t.type==='防禦'?.09:0))*(1+rat.mass),.7,1.6),grip:bit.grip,drive:bit.drive,rail:bit.rail,drain:bit.spinDrain,stability:rat.stability,damage:(t.a-4)*.13,stamina:t.e};};
+ const cores=Object.fromEntries((parts.cores||[{id:'alloy',mass:.20,radius:.176,y:.178,stability:1,drain:1,drive:1,armor:1}]).map(t=>[t.id,t]));
+ const getParts=p=>({rat:rats[p.build?.ratchet]||rats.wide7,bit:bits[p.build?.bit]||bits.taper,core:cores[p.build?.core]||cores.alloy});
+ const stats=p=>{const t=topBy[p.top],{rat,bit,core}=getParts(p);return {mass:clamp((1+(t.d-5)*.073+(t.type==='防禦'?.09:0))*(1+rat.mass),.7,1.6),grip:bit.grip,drive:bit.drive*core.drive,rail:bit.rail,drain:bit.spinDrain*core.drain,stability:rat.stability+(core.stability-1)*.3,core,damage:(t.a-4)*.13,stamina:t.e};};
  function fixed(r,shape,x,y,z,restitution=.87,friction=.5){const c=r.physics.world.createCollider(shape.setTranslation(x,y,z).setRestitution(restitution).setFriction(friction));return c;}
  function makeArena(r){
   const world=new R.World(V(0,-17.5,0));
@@ -79,7 +80,7 @@ function makeEngine(tops,parts,callbacks){
    const a=TAU*i/membersCount-Math.PI/2+.48;
    const launch=p.launch||{angle:0,power:85,lane:0};
    const lane=clamp(launch.lane||0,-1,1),angle=clamp(launch.angle||0,-40,40)*Math.PI/180;
-   const theta=a+lane*.22,launchSpeed=(1.2+clamp(launch.power||85,55,100)*.020)*stats(p).drive;
+   const theta=a+lane*.22,launchSpeed=(1.4+clamp(launch.power||85,55,100)*.025)*stats(p).drive;
    const x=(1.92+Math.abs(lane)*.22)*Math.cos(theta),z=(1.92+Math.abs(lane)*.22)*Math.sin(theta),t=topBy[p.top];
    const st=stats(p),rad=.48,spinRate=(77+st.stamina*3)*(0.79+clamp(launch.power||85,55,100)*.0025);
    const direct=theta+Math.PI/2+angle;
@@ -98,6 +99,11 @@ function makeEngine(tops,parts,callbacks){
      .setTranslation(0,.05,0).setDensity(st.mass*4.7).setFriction(.23*st.grip)
      .setRestitution(.89).setActiveEvents(events).setContactForceEventThreshold(.2),body);
    const contacts=[rim];
+   // Core mass is a distinct compound collider; it changes the true Rapier mass, COM and inertia.
+   // Scale all three variants consistently to the existing arena physics units.
+   const core=st.core,coreHeight=.08;
+   const coreShape=r.physics.world.createCollider(R.ColliderDesc.cylinder(coreHeight/2,core.radius).setTranslation(0,core.y,0).setDensity(core.mass*.38/(Math.PI*core.radius**2*coreHeight)).setFriction(.17).setRestitution(.52),body);
+   contacts.push(coreShape);
    for(let j=0;j<shape.lobes;j++){
      const az=TAU*j/shape.lobes + (shape.shape==='swept'?.10:0);
      const rr=shape.reach-(j%2&&shape.shape==='hammer'?.04:0);
@@ -276,7 +282,8 @@ function makeEngine(tops,parts,callbacks){
      // Strong enough to turn back even a maximum-speed charge within the lane.
      const desiredRad=radius>5.8?-6.2:-2.4;
      const radialKick=clamp((desiredRad-vRad)*.19,-4,1.4);
-     const tangentialKick=clamp((5.4-vTan)*.065,-.7,.7);
+     const tangentialKick=clamp(((6.6+st.rail*1.2)-vTan)*.065,-.7,.7);
+     if(tangentialKick>0)p.spinEnergy=Math.max(0,p.spinEnergy-tangentialKick*.08);
      b.applyImpulse(V((nx*radialKick+tx*tangentialKick)*b.mass(),0,(nz*radialKick+tz*tangentialKick)*b.mass()),true);
    }
    // The mouth of each N/S gate has an arcade-style return lip. Passive orbiting,
@@ -445,7 +452,7 @@ function makeEngine(tops,parts,callbacks){
     spin:Math.round(p.spin),wobble:Math.round(p.wobble),alive:p.alive,reason:p.koReason||'',rail:p.railTimer>0,
     cool:+p.cool.toFixed(1),chargeCd:+p.chargeCd.toFixed(1),counterCd:+p.counterCd.toFixed(1),countering:p.counterUntil>r.age,charging:p.chargeUntil>r.age,shield:p.fortressUntil>r.age,
     phase:p.phaseUntil>r.age,boost:p.boostUntil>r.age,blade:p.bladeUntil>r.age,impact:p.impact>0,skillCount:p.skillCount,
-    rpm:Math.round((p.physicalSpin||p.spin)*p.initialSpin/100*60/(Math.PI*2)),launch:p.launch};})};
+    rpm:Math.round((p.physicalSpin||p.spin)*p.initialSpin/100*60/(Math.PI*2)),mass:+p.body.mass().toFixed(4),launch:p.launch};})};
  }
  function free(r){if(r.physics?.world)r.physics.world.free();r.physics=null;}
  return {create,tick,charge,counter,skill,snapshot,free,stats};

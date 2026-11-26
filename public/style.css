@@ -126,3 +126,5 @@
 .volume-control input{width:80px;accent-color:#ffad68;cursor:pointer}
 @media(max-width:720px){.volume-control{font-size:0}.volume-control input{width:52px}.header-right{gap:7px}}
 @media(max-width:365px){.volume-control input{width:42px}}
+
+.garage-3d{background:#121b23;touch-action:none;border-radius:6px}.garage-tools{display:flex;align-items:center;gap:9px;margin:5px 0 12px}.garage-tools button{min-height:36px;padding:6px 12px}.garage-tools small{font-size:10px;color:#afc0cb}@media(max-width:720px){.garage-tools button{min-height:44px}}

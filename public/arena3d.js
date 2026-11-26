@@ -1,4 +1,5 @@
 import * as THREE from './vendor/three.module.js';
+import {makeMechanicalTop,disposeMechanicalTop} from './mechanical-top.mjs';
 import {fitDistance, projectPoint, visibleTopHeight} from './framing.mjs';
 // Actual WebGL 3D: dynamic rigid-body poses are broadcast from the authoritative Rapier server.
 const stage=document.getElementById('stage');
@@ -237,157 +238,35 @@ function createFighterBadge(p,order,color,isMine=false){
 }
 function releaseFighter(obj){
  releaseMotionLayer(obj.motion);
- scene.remove(obj.group);obj.group.traverse(o=>{if(o.isMesh){o.geometry?.dispose();o.material?.dispose();}});
+ scene.remove(obj.group);disposeMechanicalTop(obj.group);
  if(obj.badge){scene.remove(obj.badge);obj.badge.material.map?.dispose();obj.badge.material.dispose();}
 }
 
 // V9.3 visual-only redesign: game-scale layered mechanical spinning tops.
 // Keep every mesh inside the original ~0.5 m collision footprint; Rapier remains authoritative.
-function buildTop(top,parts={}){
- const main=parts.paint||top.color||'#ff7355', accent=top.accent||'#ffe8ab';
- const root=new THREE.Group();root.userData.fighterId=null;
- const bladePart=new THREE.Group(),ratchetPart=new THREE.Group(),bitPart=new THREE.Group();
- root.add(bladePart,ratchetPart,bitPart);
- root.userData.assemblies={bladePart,ratchetPart,bitPart};
- const form=top.blade||{lobes:5,reach:.40,tip:.12,shape:'wave'};
- const count=Math.max(2,form.lobes||5),shape=form.shape||'wave';
- const finish=(c,metalness,roughness,emissive=c,intensity=0)=>{
-  const base={color:c,metalness,roughness,emissive,emissiveIntensity:intensity,envMapIntensity:1.05};
-  return graphics.level==='high'?new THREE.MeshPhysicalMaterial({...base,clearcoat:.46,clearcoatRoughness:.15}):new THREE.MeshStandardMaterial(base);
- };
- const armor=finish('#253041',.82,.29),dark=mat('#0f1827',.68,.38);
- const steel=finish('#c5d1de',.92,.19),bright=finish('#edf4ff',.80,.17);
- const color=finish(main,.65,.24,main,.11),line=finish(accent,.75,.20,accent,.18);
- const clear=finish(main,.44,.18,main,.35);
- const make=(geo,m,parent,x=0,y=0,z=0)=>{const obj=mesh(geo,m,parent);obj.position.set(x,y,z);obj.castShadow=!mobile;return obj;};
- const cyl=(a,b,h,m,parent,y,segs=48)=>make(new THREE.CylinderGeometry(a,b,h,segs),m,parent,0,y);
- const tor=(r,t,y,m,parent=bladePart)=>{const o=make(new THREE.TorusGeometry(r,t,8,48),m,parent,0,y);o.rotation.x=Math.PI/2;return o;};
- // The blade is a thick mechanical rotor, not an almost flat coin.
- cyl(.350,.343,.15,armor,bladePart,.015);
- cyl(.298,.327,.055,color,bladePart,.106);
- tor(.331,.032,.105,steel);
- tor(.255,.020,.143,line);
- const amp=shape==='shield'?.053:shape==='hammer'?.092:shape==='axe'?.112:shape==='swept'?.086:shape==='talon'?.099:.069;
- const steps=Math.max(80,count*16),profile=[];
- for(let i=0;i<steps;i++){
-  const a=i*Math.PI*2/steps,phase=(a*count/(Math.PI*2))%1;
-  let pulse;
-  switch(shape){
-   case 'shield': pulse=.45+.45*Math.pow(Math.max(0,Math.cos(phase*Math.PI*2)),2);break;
-   case 'hammer': pulse=phase<.44?.94:Math.max(.10,.94-(phase-.44)*1.55);break;
-   case 'axe': pulse=phase<.22?.42+phase*2.6:Math.max(.07,1-(phase-.22)*1.24);break;
-   case 'swept': pulse=Math.pow(1-phase,.58);break;
-   case 'talon': pulse=phase<.78?(.18+phase*1.04):Math.max(.10,1-(phase-.78)*4.1);break;
-   default: pulse=.48+.47*Math.sin(phase*Math.PI);break;
-  }
-  const r=.365+amp*pulse;
-  profile.push([Math.cos(a)*r,Math.sin(a)*r]);
- }
- const rotorShape=new THREE.Shape();profile.forEach(([x,z],i)=>i?rotorShape.lineTo(x,z):rotorShape.moveTo(x,z));rotorShape.closePath();
- const rotorGeo=new THREE.ExtrudeGeometry(rotorShape,{depth:.115,steps:1,bevelEnabled:true,bevelThickness:.014,bevelSize:.012,bevelSegments:1,curveSegments:3});
- // An extruded XY shape rotates to the world's horizontal XZ plane.
- const rotor=make(rotorGeo,[color,steel],bladePart,0,-.012,0);rotor.rotation.x=-Math.PI/2;
- const innerGear=cyl(.247,.254,.032,dark,bladePart,.158);
- tor(.247,.015,.180,steel);
- // Three-dimensional wedge armor on the upper rotor; shape and lobe count vary by blade.
- for(let i=0;i<count;i++){
-  const a=(i+.5)*Math.PI*2/count, sector=Math.min(.39,Math.PI/count*.67);
-  const inner=.283,outer=shape==='shield'?.399:.425;
-  const plate=new THREE.Shape();
-  for(let j=0;j<=5;j++){
-   const ang=a-sector+(sector*2*j/5);
-   const r=inner+(outer-inner)*(j/5);
-   j?plate.lineTo(Math.cos(ang)*r,Math.sin(ang)*r):plate.moveTo(Math.cos(ang)*r,Math.sin(ang)*r);
-  }
-  for(let j=5;j>=0;j--){const ang=a-sector+sector*2*j/5;const r=inner+(outer-inner)*.13;plate.lineTo(Math.cos(ang)*r,Math.sin(ang)*r);}
-  plate.closePath();
-  const plateGeo=new THREE.ExtrudeGeometry(plate,{depth:.029,bevelEnabled:true,bevelSize:.007,bevelThickness:.008,bevelSegments:1,steps:1});
-  const m=make(plateGeo,i%3===0?line:i%2?steel:color,bladePart,0,.145+(i%3===0?.012:0),0);
-  m.rotation.x=-Math.PI/2;
-  const bolt=make(new THREE.CylinderGeometry(.017,.017,.010,8),i%2?bright:dark,bladePart,Math.cos(a)*.295,.194,Math.sin(a)*.295);
- }
- // Raised center cap / locking assembly: clearly a spinning top from any camera angle.
- cyl(.203,.215,.052,steel,bladePart,.189);
- cyl(.173,.177,.035,dark,bladePart,.228);
- tor(.178,.015,.250,line);
- const emblem=cyl(.128,.130,.030,color,bladePart,.260,24);
- const symbol=make(new THREE.OctahedronGeometry(.088,0),bright,bladePart,0,.288,0);symbol.scale.y=.28;
- for(let i=0;i<4;i++){
-  const a=i*Math.PI/2+.45;
-  make(new THREE.BoxGeometry(.035,.018,.075),line,bladePart,Math.cos(a)*.146,.265,Math.sin(a)*.146).rotation.y=-a;
- }
- // Ratchet looks like a second removable gear, with an obvious steel waist.
- const ratchet=parts.ratchet||'wide7';
- const gears={low3:3,heavy5:5,wide7:7,tall4:4,dense9:9,swift2:2};
- const gear=gears[ratchet]||7,heavy=ratchet==='heavy5'||ratchet==='dense9';
- const width=heavy?.270:ratchet==='swift2'?.225:.246;
- cyl(width,width*.93,.115,armor,ratchetPart,-.148,32);
- cyl(.180,.171,.061,steel,ratchetPart,-.217,32);
- const ratMat=heavy?steel:color;
- for(let j=0;j<gear;j++){
-  const a=2*Math.PI*j/gear;
-  const t=make(new THREE.BoxGeometry(heavy?.091:.072,.100,heavy?.097:.066),j%2?ratMat:steel,ratchetPart,
-   Math.cos(a)*(width-.016),-.154,Math.sin(a)*(width-.016));t.rotation.y=-a;
- }
- const ratMark=make(new THREE.TorusGeometry(.190,.014,6,36),line,ratchetPart,0,-.085,0);ratMark.rotation.x=Math.PI/2;
- // The bit is a real distinct interchangeable shaft/tip, not a tiny glowing ball.
- const bit=parts.bit||'taper';
- const rubber=mat('#17212d',.1,.86),bitMat=bit==='rubber'?rubber:color;
- cyl(.134,.119,.080,steel,bitPart,-.264,32);
- cyl(.110,.101,.055,dark,bitPart,-.306,32);
- const cone=(rt,rb,h,y,m,seg=28)=>cyl(rt,rb,h,m,bitPart,y,seg);
- if(bit==='flat'){
-  cone(.103,.124,.079,-.353,bitMat);cone(.123,.123,.018,-.393,rubber);
- }else if(bit==='rush'){
-  cone(.112,.090,.088,-.355,bitMat);
-  for(let i=0;i<6;i++){const a=i*Math.PI/3;const t=make(new THREE.BoxGeometry(.029,.040,.039),steel,bitPart,Math.cos(a)*.112,-.363,Math.sin(a)*.112);t.rotation.y=-a;}
-  cone(.092,.091,.018,-.402,steel);
- }else if(bit==='ball'){
-  cone(.107,.092,.049,-.343,bitMat);
-  make(new THREE.SphereGeometry(.089,18,12),steel,bitPart,0,-.352,0);
- }else if(bit==='needle'){
-  cone(.104,.053,.073,-.345,bitMat);
-  cone(.056,.009,.096,-.386,steel);
- }else if(bit==='orbit'){
-  cone(.105,.092,.066,-.343,bitMat);
-  const collar=make(new THREE.TorusGeometry(.093,.022,6,24),steel,bitPart,0,-.368,0);collar.rotation.x=Math.PI/2;
-  make(new THREE.SphereGeometry(.072,16,12),line,bitPart,0,-.372,0);
- }else if(bit==='gear'){
-  cone(.117,.087,.088,-.352,bitMat);
-  for(let i=0;i<8;i++){const a=i*Math.PI/4;const t=make(new THREE.BoxGeometry(.027,.053,.030),steel,bitPart,Math.cos(a)*.105,-.362,Math.sin(a)*.105);t.rotation.y=-a;}
-  cone(.079,.055,.039,-.411,steel);
- }else if(bit==='rubber'){
-  cone(.115,.131,.094,-.358,rubber);
-  cone(.129,.129,.027,-.402,bitMat);
- }else{
-  // Taper: clearly conical pivot with a small spherical contact foot.
-  cone(.114,.047,.124,-.359,bitMat);
-  make(new THREE.SphereGeometry(.031,12,8),steel,bitPart,0,-.417,0);
- }
- return root;
-}
+function buildTop(top,parts={}){return makeMechanicalTop(THREE,top,parts,{high:graphics.level==='high',shadows:!mobile});}
 // Garage preview uses the same procedural artwork as battle; Rapier colliders remain simplified for performance.
 const garageCanvas=document.getElementById('garage3d');
-let garageRenderer=null,garagePreview=null,garageKey='';const garageScene=new THREE.Scene();
+let garageRenderer=null,garagePreview=null,garageKey='',garageExplode=0,garageAim=0,garageYaw=.65,garagePitch=.52,garageDrag=null,garagePrev=performance.now(),garageW=0,garageH=0;const garageScene=new THREE.Scene();
 garageScene.background=new THREE.Color('#091321');
 const garageCamera=new THREE.PerspectiveCamera(35,1,.1,30);garageCamera.position.set(1.76,1.40,2.46);garageCamera.lookAt(0,0,0);
-garageScene.add(new THREE.HemisphereLight('#d8f3ff','#1b263a',2.6));
+garageScene.add(new THREE.HemisphereLight('#d8f3ff','#1b263a',1.8));
+const assemblyButton=document.getElementById('garageExplode');assemblyButton?.addEventListener('click',()=>{garageAim=1-garageAim;assemblyButton.textContent=garageAim?'組裝':'拆解'});garageCanvas?.addEventListener('pointerdown',e=>{garageDrag={x:e.clientX,y:e.clientY};garageCanvas.setPointerCapture(e.pointerId)});garageCanvas?.addEventListener('pointermove',e=>{if(!garageDrag)return;garageYaw-=(e.clientX-garageDrag.x)*.012;garagePitch=THREE.MathUtils.clamp(garagePitch+(e.clientY-garageDrag.y)*.009,.12,1.38);garageDrag={x:e.clientX,y:e.clientY}});for(const ev of ['pointerup','pointercancel'])garageCanvas?.addEventListener(ev,()=>garageDrag=null);
 applyGraphicsProfile();
 const glight=new THREE.DirectionalLight('#ffcc9c',5);glight.position.set(-2,5,4);garageScene.add(glight);
 function updateGarage(state){
  const top=state.tops?.find(t=>t.id===state.selected);
  if(!top||!garageCanvas)return;
- const key=[top.id,state.build?.ratchet,state.build?.bit,state.build?.paint].join('|');
+ const key=[top.id,state.build?.ratchet,state.build?.bit,state.build?.core,state.build?.paint].join('|');
  if(key!==garageKey){
-  if(garagePreview){garageScene.remove(garagePreview);garagePreview.traverse(m=>{if(m.isMesh)m.geometry.dispose();});}
+  if(garagePreview){garageScene.remove(garagePreview);disposeMechanicalTop(garagePreview);}
   garagePreview=buildTop(top,state.build||{});garageScene.add(garagePreview);garageKey=key;
-  const {bladePart,ratchetPart,bitPart}=garagePreview.userData.assemblies;
-  bladePart.position.y=.36;ratchetPart.position.y=-.07;bitPart.position.y=-.45;
+  garagePreview.userData.setExplode(garageExplode);
  }
- if(!garageRenderer){try{garageRenderer=new THREE.WebGLRenderer({canvas:garageCanvas,antialias:!mobile,powerPreference:'low-power'});garageRenderer.setPixelRatio(Math.min(devicePixelRatio||1,mobile?1.0:1.25));garageRenderer.outputColorSpace=THREE.SRGBColorSpace;}catch(e){console.warn('Garage preview unavailable',e);return;}}
+ if(!garageRenderer){try{garageRenderer=new THREE.WebGLRenderer({canvas:garageCanvas,antialias:!mobile,powerPreference:'low-power'});garageRenderer.setPixelRatio(Math.min(devicePixelRatio||1,mobile?1.0:1.25));garageRenderer.outputColorSpace=THREE.SRGBColorSpace;garageRenderer.toneMapping=THREE.ACESFilmicToneMapping;garageRenderer.toneMappingExposure=1.0;}catch(e){console.warn('Garage preview unavailable',e);return;}}
  const rc=garageCanvas.getBoundingClientRect(),w=Math.max(2,Math.round(rc.width)),h=Math.max(2,Math.round(rc.height));
- if(garageRenderer.domElement.width!==w||garageRenderer.domElement.height!==h){garageRenderer.setSize(w,h,false);garageCamera.aspect=w/h;garageCamera.updateProjectionMatrix();}
- garagePreview.rotation.y+=.018;garageRenderer.render(garageScene,garageCamera);
+ if(garageW!==w||garageH!==h){garageW=w;garageH=h;garageRenderer.setSize(w,h,false);garageCamera.aspect=w/h;garageCamera.updateProjectionMatrix();}
+ const gd=Math.min(.1,(performance.now()-garagePrev)/1000);garagePrev=performance.now();garageExplode+=(garageAim-garageExplode)*Math.min(1,gd*7);garagePreview.userData.setExplode(garageExplode);let d=2.45+garageExplode*.65;garageCamera.position.set(Math.cos(garageYaw)*Math.cos(garagePitch)*d,Math.sin(garagePitch)*d,Math.sin(garageYaw)*Math.cos(garagePitch)*d);garageCamera.lookAt(0,.04,0);garageRenderer.render(garageScene,garageCamera);
 }
 // GPU-friendly soft spark sprites: one Points draw call per impact, not dozens of meshes.
 const glowCanvas=document.createElement('canvas');glowCanvas.width=glowCanvas.height=64;
@@ -630,9 +509,10 @@ function loop(t){requestAnimationFrame(loop);const dt=Math.min(.05,Math.max(.001
    }
    if(!obj.group.userData.init){obj.group.position.copy(obj.targetP);obj.group.quaternion.copy(obj.targetQ);obj.group.userData.init=true;}
    else{obj.group.position.copy(obj.targetP);obj.group.quaternion.copy(obj.targetQ);}
+   obj.group.userData.setExposure?.(p.alive?(p.rpm||0):0,dt,time);
    if(obj.badge){obj.badge.visible=!!p.alive;obj.badge.position.set(obj.group.position.x,obj.group.position.y+1.15,obj.group.position.z);}
    updateMotionLayer(obj,p,Number.isFinite(s?.time)?s.time:time);
-   const tail=obj.group.userData.tail;if(!tail){const line=mesh(new THREE.TorusGeometry(.53,.020,6,30),mat(top?.color||'#5be2ef',.1,.7,top?.color||'#5be2ef',.8),obj.group);line.position.y=-.02;line.rotation.x=Math.PI/2;obj.group.userData.tail=line;}else tail.visible=!!p.charging||!!p.boost||!!p.countering;
+   const tail=obj.group.userData.tail;if(!tail){const line=mesh(new THREE.TorusGeometry(.53,.020,6,30),mat(top?.color||'#5be2ef',.1,.7,top?.color||'#5be2ef',.8),obj.group);line.position.y=-.02;line.rotation.x=Math.PI/2;obj.group.userData.tail=line;line.visible=!!p.charging||!!p.boost||!!p.countering;}else tail.visible=!!p.charging||!!p.boost||!!p.countering;
  }
  for(const [id,obj] of models)if(!active.has(id)){releaseFighter(obj);models.delete(id);}
  const myActor=fighters.find(p=>p.id===state.ownId),myModel=models.get(state.ownId);

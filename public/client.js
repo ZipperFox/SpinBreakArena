@@ -1,14 +1,14 @@
 'use strict';
 (() => {
 const $ = id => document.getElementById(id);
-const els = Object.fromEntries(['roster','profile','topType','bigTop','topName','topSkill','topStats','statTotal','typeFilters','netDot','netState','btnSound','soundText','bladeSelect','ratchetSelect','bitSelect','buildInfo','garage3d','paintSelect','paintReset','presetSelect','presetSave','presetLoad','launchPower','launchAngle','launchLane','launchPowerValue','launchAngleValue','stage','stageFrame','stageTitle','gameTimer','roundState','fightHud','centerOverlay','overlayPlay','impactBanner','eventToast','playerName','roomInput','btnCreate','btnJoin','roomMessage','lobbyHeading','lobbyStatus','roomCode','btnCopy','btnShare','participants','arenaSelect','arenaDescription','botCount','btnStart','btnAgain','btnLeave','scoreboard','combatLog','touchTarget','touchBurst','touchGuard','touchCounter','touchController','chaosSelect','anomalyStatus','arenaRosterStatus'].map(x=>[x,$(x)]));
+const els = Object.fromEntries(['roster','profile','topType','bigTop','topName','topSkill','topStats','statTotal','typeFilters','netDot','netState','btnSound','soundText','bladeSelect','ratchetSelect','bitSelect','coreSelect','buildInfo','garage3d','paintSelect','paintReset','presetSelect','presetSave','presetLoad','launchPower','launchAngle','launchLane','launchPowerValue','launchAngleValue','stage','stageFrame','stageTitle','gameTimer','roundState','fightHud','centerOverlay','overlayPlay','impactBanner','eventToast','playerName','roomInput','btnCreate','btnJoin','roomMessage','lobbyHeading','lobbyStatus','roomCode','btnCopy','btnShare','participants','arenaSelect','arenaDescription','botCount','btnStart','btnAgain','btnLeave','scoreboard','combatLog','touchTarget','touchBurst','touchGuard','touchCounter','touchController','chaosSelect','anomalyStatus','arenaRosterStatus'].map(x=>[x,$(x)]));
 const ctx=els.stage.getContext('2d',{alpha:false});
 const soundEngine=window.SPINBREAK_AUDIO?.create?.();
 const effectsVolume=document.getElementById('effectsVolume');
 try{const volume=localStorage.getItem('spinbreak-effects-volume');if(volume!==null&&effectsVolume)effectsVolume.value=String(Math.min(100,Math.max(0,+volume)));}catch{}
 soundEngine?.setVolume?.(Number(effectsVolume?.value ?? 50)/100);
 effectsVolume?.addEventListener('input',()=>{soundEngine?.setVolume?.(Number(effectsVolume.value)/100);try{localStorage.setItem('spinbreak-effects-volume',effectsVolume.value);}catch{}});
-let ws,ownId=null,room=null,tops=[],arenas=[],parts={ratchets:[],bits:[]},selected='phoenix',build={ratchet:'wide7',bit:'taper',paint:null},launch={power:85,angle:0,lane:0},filter='全部',latest=null,vis={},particles=[],shockwaves=[],trails={},logEntries=[],lastEvent='',status='offline',audioOn=false;
+let ws,ownId=null,room=null,tops=[],arenas=[],parts={ratchets:[],bits:[],cores:[]},selected='phoenix',build={ratchet:'wide7',bit:'taper',core:'alloy',paint:null},launch={power:85,angle:0,lane:0},filter='全部',latest=null,vis={},particles=[],shockwaves=[],trails={},logEntries=[],lastEvent='',status='offline',audioOn=false;
 let playTime=0,flash=0,shake=0,bannerTimer=null,toastTimer=null,gameOverShown=false;
 const timeline=new window.SPINBREAK_SYNC.Timeline(160);
 const pendingEvents=[];let resultTimer=null,shownRound=null;
@@ -27,7 +27,7 @@ const queryRoom=(new URLSearchParams(location.search).get('room')||'').slice(0,5
 const saveSession=(token,code)=>{try{sessionStorage.setItem(storageKey,JSON.stringify({token,code}));}catch{}};
 const readSession=()=>{try{return JSON.parse(sessionStorage.getItem(storageKey)||'null');}catch{return null;}};
 const clearSession=()=>{try{sessionStorage.removeItem(storageKey);}catch{}};
-try{const previousName=localStorage.getItem('spinbreak-player-name');if(previousName)els.playerName.value=previousName;const b=JSON.parse(localStorage.getItem('spinbreak-build-v4')||'null');if(b?.top)selected=b.top;if(b?.ratchet)build.ratchet=b.ratchet;if(b?.bit)build.bit=b.bit;if(/^#[0-9a-f]{6}$/i.test(b?.paint||''))build.paint=b.paint;const l=JSON.parse(localStorage.getItem('spinbreak-launch-v9')||'null');if(l)launch={power:Math.max(55,Math.min(100,+l.power||85)),angle:Math.max(-40,Math.min(40,+l.angle||0)),lane:[-1,0,1].includes(+l.lane)?+l.lane:0};}catch{}
+try{const previousName=localStorage.getItem('spinbreak-player-name');if(previousName)els.playerName.value=previousName;const b=JSON.parse(localStorage.getItem('spinbreak-build-v4')||'null');if(b?.top)selected=b.top;if(b?.ratchet)build.ratchet=b.ratchet;if(b?.bit)build.bit=b.bit;if(b?.core)build.core=b.core;if(/^#[0-9a-f]{6}$/i.test(b?.paint||''))build.paint=b.paint;const l=JSON.parse(localStorage.getItem('spinbreak-launch-v9')||'null');if(l)launch={power:Math.max(55,Math.min(100,+l.power||85)),angle:Math.max(-40,Math.min(40,+l.angle||0)),lane:[-1,0,1].includes(+l.lane)?+l.lane:0};}catch{}
 const input={charge:false,burst:false};let targetId=null;
 window.SPINBREAK_3D_BRIDGE={getState:()=>{const visual=presentationState();showSyncedEvents();return {latest:visual,room,tops,parts,selected,build,launch,ownId,targetId};},setTarget:id=>{if(latest?.fighters?.some(p=>p.id===id&&p.alive&&id!==ownId)){targetId=id;notify('鎖定 '+latest.fighters.find(p=>p.id===id).name);updateChargeUI();}}};
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
@@ -88,18 +88,18 @@ function partName(group,id){return parts[group].find(p=>p.id===id)?.name||id;}
 function partCode(group,id){return parts[group].find(p=>p.id===id)?.code||id;}
 function renderBuildOptions(){
  els.bladeSelect.innerHTML=tops.map(t=>`<option value="${t.id}">${t.name} · ${t.type}</option>`).join('');
- for(const [el,group] of [[els.ratchetSelect,'ratchets'],[els.bitSelect,'bits']])el.innerHTML=parts[group].map(p=>`<option value="${p.id}">${p.code} · ${p.name}</option>`).join('');
+ for(const [el,group] of [[els.ratchetSelect,'ratchets'],[els.bitSelect,'bits'],[els.coreSelect,'cores']])el.innerHTML=(parts[group]||[]).map(p=>`<option value="${p.id}">${p.code} · ${p.name}</option>`).join('');
  if(!parts.ratchets.some(p=>p.id===build.ratchet))build.ratchet='wide7';
- if(!parts.bits.some(p=>p.id===build.bit))build.bit='taper';
- els.bladeSelect.value=selected;els.ratchetSelect.value=build.ratchet;els.bitSelect.value=build.bit;syncGarageControls();updateBuildInfo();
+ if(!parts.bits.some(p=>p.id===build.bit))build.bit='taper';if(!(parts.cores||[]).some(p=>p.id===build.core))build.core='alloy';
+ els.bladeSelect.value=selected;els.ratchetSelect.value=build.ratchet;els.bitSelect.value=build.bit;els.coreSelect.value=build.core;syncGarageControls();updateBuildInfo();
 }
 function updateBuildInfo(){
- const r=parts.ratchets.find(p=>p.id===build.ratchet),b=parts.bits.find(p=>p.id===build.bit);
- els.buildInfo.innerHTML=`<strong>${escapeHTML(getTop(selected)?.name||'')} · ${escapeHTML(r?.code||'')} / ${escapeHTML(b?.code||'')}</strong><span>${escapeHTML(r?.desc||'')}<br>${escapeHTML(b?.desc||'')}<br>發射 ${launch.power}%／${launch.angle}°，${launch.lane===0?'中央':launch.lane<0?'偏左':'偏右'}路線</span>`;window.dispatchEvent(new Event('spinbreak-garage-change'));
+ const r=parts.ratchets.find(p=>p.id===build.ratchet),b=parts.bits.find(p=>p.id===build.bit),core=(parts.cores||[]).find(p=>p.id===build.core);
+ els.buildInfo.innerHTML=`<strong>${escapeHTML(getTop(selected)?.name||'')} · ${escapeHTML(r?.code||'')} / ${escapeHTML(b?.code||'')} / ${escapeHTML(core?.code||'')}</strong><span>${escapeHTML(r?.desc||'')}<br>${escapeHTML(b?.desc||'')}<br>${escapeHTML(core?.desc||'')} · 核心質量 ${core?.mass??'—'}（設計值）<br>發射 ${launch.power}%／${launch.angle}°，${launch.lane===0?'中央':launch.lane<0?'偏左':'偏右'}路線</span>`;window.dispatchEvent(new Event('spinbreak-garage-change'));
 }
-for(const id of ['bladeSelect','ratchetSelect','bitSelect'])els[id].addEventListener('change',()=>{
+for(const id of ['bladeSelect','ratchetSelect','bitSelect','coreSelect'])els[id].addEventListener('change',()=>{
  if(room?.status==='playing'){notify('戰鬥中無法修改零件');renderBuildOptions();return;}
- selected=els.bladeSelect.value;build={ratchet:els.ratchetSelect.value,bit:els.bitSelect.value,paint:build.paint};saveBuild();updateBuildInfo();renderRoster();renderProfile();
+ selected=els.bladeSelect.value;build={ratchet:els.ratchetSelect.value,bit:els.bitSelect.value,core:els.coreSelect.value,paint:build.paint};saveBuild();updateBuildInfo();renderRoster();renderProfile();
  if(room)send({t:'set',top:selected,build,launch,name:els.playerName.value});
 });
 function renderProfile(){const t=getTop(selected);if(!t)return;updateBuildInfo();els.topType.textContent=t.type+'型';els.bigTop.innerHTML=topMarkup(t);els.topName.textContent=t.name;els.topSkill.textContent='✦ 必殺技 · '+t.skill;els.topStats.innerHTML=[['攻擊','a'],['防禦','d'],['速度','s'],['續航','e']].map(([name,k])=>`<div class="stat"><span>${name}</span><div class="stat-track"><div class="stat-fill" style="width:${t[k]*12.5}%"></div></div><strong>${t[k]}</strong></div>`).join('');els.statTotal.textContent=`刀刃 ${t.a+t.d+t.s+t.e} 點 · ${partCode('ratchets',build.ratchet)} / ${partCode('bits',build.bit)}`;
@@ -124,7 +124,7 @@ for(const id of ['launchPower','launchAngle','launchLane'])els[id].addEventListe
 const presetStorage='spinbreak-presets-v9';
 function readPresets(){try{return JSON.parse(localStorage.getItem(presetStorage)||'{}')||{};}catch{return {};}}
 els.presetSave.addEventListener('click',()=>{const p=readPresets();p[els.presetSelect.value]={top:selected,build:{...build},launch:{...launch}};try{localStorage.setItem(presetStorage,JSON.stringify(p));notify('已儲存配裝 '+(+els.presetSelect.value+1));}catch{notify('瀏覽器無法儲存配裝');}});
-els.presetLoad.addEventListener('click',()=>{if(room?.status==='playing'){notify('請在下一回合換裝');return;}const p=readPresets()[els.presetSelect.value];if(!p){notify('這個欄位還沒有配裝');return;}if(tops.some(t=>t.id===p.top))selected=p.top;build={ratchet:p.build?.ratchet||'wide7',bit:p.build?.bit||'taper',paint:p.build?.paint||null};launch={power:+p.launch?.power||85,angle:+p.launch?.angle||0,lane:+p.launch?.lane||0};renderBuildOptions();applyGarage();notify('已套用配裝 '+(+els.presetSelect.value+1));});
+els.presetLoad.addEventListener('click',()=>{if(room?.status==='playing'){notify('請在下一回合換裝');return;}const p=readPresets()[els.presetSelect.value];if(!p){notify('這個欄位還沒有配裝');return;}if(tops.some(t=>t.id===p.top))selected=p.top;build={ratchet:p.build?.ratchet||'wide7',bit:p.build?.bit||'taper',core:p.build?.core||'alloy',paint:p.build?.paint||null};launch={power:+p.launch?.power||85,angle:+p.launch?.angle||0,lane:+p.launch?.lane||0};renderBuildOptions();applyGarage();notify('已套用配裝 '+(+els.presetSelect.value+1));});
 syncGarageControls();
 els.typeFilters.addEventListener('click',e=>{const b=e.target.closest('[data-filter]');if(!b)return;filter=b.dataset.filter;for(const x of els.typeFilters.querySelectorAll('[data-filter]'))x.classList.toggle('active',x===b);renderRoster();});
 function renderArenaOptions(){els.arenaSelect.innerHTML=arenas.map(a=>`<option value="${a.id}">${a.name}</option>`).join('');}

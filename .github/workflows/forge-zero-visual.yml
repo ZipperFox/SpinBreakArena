@@ -3,6 +3,10 @@ on:
   pull_request:
     paths:
       - 'labs/forge-zero/**'
+      - 'public/**'
+      - 'physics3d.js'
+      - 'server.js'
+      - 'scripts/test-nextgen.mjs'
       - '.github/workflows/forge-zero-visual.yml'
 permissions:
   contents: read
@@ -21,6 +25,9 @@ jobs:
           node-version: '22'
       - run: npm install --no-audit --no-fund
       - run: npm run check && node scripts/test-battle.mjs
+      - name: Multiplayer and mechanical regression (root)
+        working-directory: .
+        run: npm install --omit=dev --no-audit --no-fund
       - run: npx playwright install --with-deps chromium
       - run: npm run capture
       - if: always()
