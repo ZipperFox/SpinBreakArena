@@ -1,4 +1,4 @@
-import * as T from 'three';
+import * as T from 'three';import {heightAt} from './rotor-physics.mjs';
 const TAU=2*Math.PI;
 const vertex='varying vec2 v;void main(){v=uv*2.-1.;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}';
 const waveFrag='varying vec2 v;uniform vec3 tint;uniform float phase;uniform float opacity;uniform float style;void main(){float r=length(v),a=atan(v.y,v.x);float edge=exp(-pow((r-.72)*42.,2.));float inner=exp(-pow((r-.52)*13.,2.))*.26;float rays=pow(max(0.,.5+.5*cos(a*13.+sin(a*7.+phase)*2.)),7.);float spoke=exp(-pow((r-.66)*8.,2.))*rays;float fading=1.-smoothstep(.84,1.,r);float alpha=(edge+inner+spoke*.38*style)*opacity*fading;gl_FragColor=vec4(tint*(1.1+edge*1.6),alpha);}';
@@ -16,7 +16,7 @@ export class CombatVisuals{
  this.flashes=Array.from({length:mobile?6:10},()=>{let o=new T.Sprite(new T.SpriteMaterial({map:this.flashTex,transparent:true,depthWrite:false,blending:T.AdditiveBlending,toneMapped:false}));o.visible=false;scene.add(o);return {o,life:0,max:1,size:1}});
  this.debris=new T.InstancedMesh(new T.IcosahedronGeometry(.045,0),new T.MeshStandardMaterial({color:0xd0d5d9,metalness:.8,roughness:.45}),mobile?36:84);this.debris.count=0;this.debris.frustumCulled=false;scene.add(this.debris);this.chips=[];this.tmp=new T.Object3D();
  }
- wave(e,tint,life,size,span,style=1){let p=this.pool.find(v=>!v.life)||this.pool.reduce((x,y)=>x.life<y.life?x:y);p.max=p.life=life;p.size=size;p.span=span;p.o.position.set(e.x,.09,e.z);p.o.material.uniforms.tint.value.set(tint);p.o.material.uniforms.style.value=style;p.o.visible=true;}
+ wave(e,tint,life,size,span,style=1){let p=this.pool.find(v=>!v.life)||this.pool.reduce((x,y)=>x.life<y.life?x:y);p.max=p.life=life;p.size=size;p.span=span;p.o.position.set(e.x,heightAt(e.x,e.z)+.09,e.z);p.o.material.uniforms.tint.value.set(tint);p.o.material.uniforms.style.value=style;p.o.visible=true;}
  event(kind,e){this.events++;const p=Math.min(1.8,Math.max(.1,e.power||1)),heavy=p>.82,accent=e.color||0xffbc67;
  if(kind==='hole'||kind==='anomaly'){this.wave({x:0,z:0},kind==='hole'?0x9674ff:e.kind==='wind'?0x70e5f7:0xffb268,1.1,.5,5.8,1);return}
  if(kind==='guard'){this.wave(e,accent,.52,.6,1.4,.3);return}
@@ -25,13 +25,13 @@ export class CombatVisuals{
  let tint=kind==='skill'||kind==='counter'?accent:0xffc58c;let strong=heavy||kind==='skill'||kind==='ko';
  this.wave(e,tint,strong?.55:.27,.18,strong?2.35:1.0,strong?1:.25);
  if(strong)this.wave(e,0xffe1bc,.35,.11,1.25,.12);
- let f=this.flashes.find(v=>!v.life)||this.flashes.reduce((x,y)=>x.life<y.life?x:y);f.life=f.max=strong?.20:.105;f.size=strong?1.5:.75;f.o.position.set(e.x,.53,e.z);f.o.material.color.set(tint);f.o.visible=true;
- let count=kind==='wall'?3:strong?14:5;for(let i=0;i<count&&this.chips.length<this.debris.instanceMatrix.count;i++){let a=Math.atan2(e.dz||0,e.dx||1)+(i%2?Math.PI:0)+(Math.random()-.5)*1.6,s=1.8+Math.random()*p*4;this.chips.push({x:e.x,y:.46,z:e.z,vx:Math.cos(a)*s,vz:Math.sin(a)*s,vy:1.1+Math.random()*2.6,life:.45+Math.random()*.45,rot:Math.random()*TAU})}
+ let f=this.flashes.find(v=>!v.life)||this.flashes.reduce((x,y)=>x.life<y.life?x:y);f.life=f.max=strong?.20:.105;f.size=strong?1.5:.75;f.o.position.set(e.x,heightAt(e.x,e.z)+.53,e.z);f.o.material.color.set(tint);f.o.visible=true;
+ let count=kind==='wall'?3:strong?14:5;for(let i=0;i<count&&this.chips.length<this.debris.instanceMatrix.count;i++){let a=Math.atan2(e.dz||0,e.dx||1)+(i%2?Math.PI:0)+(Math.random()-.5)*1.6,s=1.8+Math.random()*p*4;this.chips.push({x:e.x,y:heightAt(e.x,e.z)+.46,z:e.z,vx:Math.cos(a)*s,vz:Math.sin(a)*s,vy:1.1+Math.random()*2.6,life:.45+Math.random()*.45,rot:Math.random()*TAU})}
  }
  update(dt,actors){this.time+=dt;for(let p of this.pool){if(!p.life)continue;p.life=Math.max(0,p.life-dt);p.o.visible=p.life>0;let u=1-p.life/p.max;p.o.scale.setScalar(p.size+p.span*(1-Math.pow(1-u,2)));p.o.material.uniforms.phase.value=u*5;p.o.material.uniforms.opacity.value=p.life/p.max*.62;}
  for(let f of this.flashes){if(!f.life)continue;f.life=Math.max(0,f.life-dt);f.o.visible=f.life>0;let u=1-f.life/f.max;f.o.scale.setScalar(f.size*(.4+u*.9));f.o.material.opacity=(1-u)**2*.9}
- for(let i=0;i<actors.length;i++){let a=actors[i],o=this.auras[i],s=this.shields[i];o.visible=a.alive&&(a.charge>.05||a.boost>.05);o.position.set(a.x,.065,a.z);o.scale.setScalar(1.03+(a.boost>0?.25:0));o.material.uniforms.phase.value=this.time*9+i;o.material.uniforms.strength.value=a.boost>0?.8:Math.min(.75,a.charge);s.visible=a.alive&&a.guard>0;s.position.set(a.x,.49,a.z);s.material.uniforms.time.value=this.time;s.material.uniforms.strength.value=Math.min(1,a.guard*3);}
- let n=0;for(let i=this.chips.length-1;i>=0;i--){let q=this.chips[i];q.life-=dt;if(q.life<=0){this.chips.splice(i,1);continue}q.vy-=8*dt;q.x+=q.vx*dt;q.z+=q.vz*dt;q.y+=q.vy*dt;if(q.y<.065){q.y=.065;q.vy=Math.abs(q.vy)*.30;q.vx*=.65;q.vz*=.65}q.rot+=dt*9;this.tmp.position.set(q.x,q.y,q.z);this.tmp.rotation.set(q.rot,q.rot*.7,q.rot*.3);this.tmp.scale.setScalar(Math.min(1,q.life*5));this.tmp.updateMatrix();this.debris.setMatrixAt(n++,this.tmp.matrix)}this.debris.count=n;this.debris.instanceMatrix.needsUpdate=true;
+ for(let i=0;i<actors.length;i++){let a=actors[i],o=this.auras[i],s=this.shields[i];o.visible=a.alive&&(a.charge>.05||a.boost>.05);o.position.set(a.x,heightAt(a.x,a.z)+.065,a.z);o.scale.setScalar(1.03+(a.boost>0?.25:0));o.material.uniforms.phase.value=this.time*9+i;o.material.uniforms.strength.value=a.boost>0?.8:Math.min(.75,a.charge);s.visible=a.alive&&a.guard>0;s.position.set(a.x,heightAt(a.x,a.z)+.49,a.z);s.material.uniforms.time.value=this.time;s.material.uniforms.strength.value=Math.min(1,a.guard*3);}
+ let n=0;for(let i=this.chips.length-1;i>=0;i--){let q=this.chips[i];q.life-=dt;if(q.life<=0){this.chips.splice(i,1);continue}q.vy-=8*dt;q.x+=q.vx*dt;q.z+=q.vz*dt;q.y+=q.vy*dt;if(q.y<heightAt(q.x,q.z)+.065){q.y=heightAt(q.x,q.z)+.065;q.vy=Math.abs(q.vy)*.30;q.vx*=.65;q.vz*=.65}q.rot+=dt*9;this.tmp.position.set(q.x,q.y,q.z);this.tmp.rotation.set(q.rot,q.rot*.7,q.rot*.3);this.tmp.scale.setScalar(Math.min(1,q.life*5));this.tmp.updateMatrix();this.debris.setMatrixAt(n++,this.tmp.matrix)}this.debris.count=n;this.debris.instanceMatrix.needsUpdate=true;
  }
  reset(){for(let p of [...this.pool,...this.flashes]){p.life=0;p.o.visible=false}this.chips=[];this.debris.count=0;for(let o of [...this.auras,...this.shields])o.visible=false}
  get diagnostics(){return {events:this.events,waves:this.pool.filter(p=>p.life>0).length,chips:this.chips.length,shields:this.shields.filter(o=>o.visible).length}}

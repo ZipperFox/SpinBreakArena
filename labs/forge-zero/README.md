@@ -26,3 +26,6 @@ Six CC0 Kenney metal impact samples; differentiated wall and pair contacts, velo
 
 ## 0.6 — combat visuals and three arenas
 Independent Forge / Void / Storm architectures use identical battle boundaries. Reusable shader shockwaves, contact flash sprites, instanced debris, charge aura, guard shield and enhanced accretion disk. Rotor tooling details and exposure streaks. Browser captures cover additional stages and guard. Existing 0.5 audio and local simulation are retained; no multiplayer or mobile hardware performance claim.
+
+## 0.7 — rotor dynamics experiment
+240 Hz fixed-step scaled planar solver: bowl gradient, angular kinetic energy, normal/tangent impulses and rail acceleration. Pure rules disable magic and anomalies; three launch modes. Shared curved floor. This is not calibrated 3D dynamics or Rapier. Production multiplayer unchanged.

@@ -1,4 +1,4 @@
-import * as T from 'three';
+import * as T from 'three';import {surfaceHeight} from './rotor-physics.mjs';
 const TAU=Math.PI*2;
 const rng=seed=>()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296};
 export const mesh=(parent,geometry,material,x=0,y=0,z=0)=>{const m=new T.Mesh(geometry,material);m.position.set(x,y,z);parent.add(m);return m};
@@ -67,4 +67,18 @@ export function buildAlternateArena(m,id){const g=new T.Group(),isVoid=id==='voi
  for(let ang of [Math.PI/2,3*Math.PI/2]){arcMesh(g,5.03,5.29,ang-.255,ang+.255,.012,.014,m.brass,.004);for(let j=-2;j<=2;j++)radialBox(g,5.16,ang+j*.085,.034,.17,.013,.09,m.black)}
  const serial=mesh(g,new T.PlaneGeometry(2.1,.525),new T.MeshBasicMaterial({map:labelTexture(data.serial),transparent:true,depthWrite:false,opacity:.85}),0,.036,3.65);serial.rotation.x=-Math.PI/2;
  const deck=mesh(g,new T.CylinderGeometry(13,13,.28,isVoid?12:64),m.black,0,-1,0);deck.receiveShadow=true;return g;
+}
+
+export function addBattleBowl(g,m,id){
+ let cv=document.createElement('canvas');cv.width=cv.height=1024;let x=cv.getContext('2d'),r=rng(8751),accent=id==='forge'?'#b58b4f':id==='void'?'#8798f7':'#73c9b8';x.fillStyle=id==='forge'?'#363c40':id==='void'?'#292f49':'#394944';x.fillRect(0,0,1024,1024);
+ const scale=512/5.6;for(let i=0;i<6500;i++){let u=r()*1024,v=r()*1024;x.strokeStyle='rgba(210,225,235,'+(.02+r()*.06)+')';x.beginPath();x.moveTo(u,v);x.lineTo(u+8+r()*45,v+(r()-.5)*2);x.stroke()}
+ for(let r of [1.35,2.55,3.8,4.78,5.35]){x.strokeStyle=r===4.78?accent:'#11171e';x.lineWidth=r===4.78?5:2;x.beginPath();x.arc(512,512,r*scale,0,TAU);x.stroke()}
+ let n=id==='void'?6:id==='storm'?10:12;for(let i=0;i<n;i++){let t=i*TAU/n;x.strokeStyle='#13181d';x.lineWidth=3;x.beginPath();x.moveTo(512+Math.cos(t)*1.4*scale,512+Math.sin(t)*1.4*scale);x.lineTo(512+Math.cos(t)*5.5*scale,512+Math.sin(t)*5.5*scale);x.stroke();x.save();x.translate(512+Math.cos(t+.14)*4.4*scale,512+Math.sin(t+.14)*4.4*scale);x.rotate(t+Math.PI/2);x.fillStyle=accent;for(let j=0;j<3;j++)x.fillRect(j*13-17,-5,7,10);x.restore()}
+ x.fillStyle=accent;x.textAlign='center';x.font='600 32px sans-serif';x.fillText(id==='forge'?'FZ / 01':id==='void'?'VC / 02':'SP / 03',512,512);x.font='15px sans-serif';x.fillText('ACCELERATION CIRCUIT',512,537);
+ let tex=new T.CanvasTexture(cv);tex.colorSpace=T.SRGBColorSpace;tex.anisotropy=4;
+ const pos=[],uv=[],idx=[],seg=128,rings=40;for(let j=0;j<=rings;j++){let r=5.6*j/rings;for(let i=0;i<=seg;i++){let t=i*TAU/seg,px=r*Math.cos(t),pz=r*Math.sin(t);pos.push(px,surfaceHeight(r),pz);uv.push(.5+px/11.2,.5-pz/11.2);if(j<rings&&i<seg){let k=j*(seg+1)+i;idx.push(k,k+1,k+seg+1,k+1,k+seg+2,k+seg+1)}}}
+ let geo=new T.BufferGeometry();geo.setAttribute('position',new T.Float32BufferAttribute(pos,3));geo.setAttribute('uv',new T.Float32BufferAttribute(uv,2));geo.setIndex(idx);geo.computeVertexNormals();let bowl=mesh(g,geo,new T.MeshStandardMaterial({map:tex,metalness:.55,roughness:.46,side:T.DoubleSide,envMapIntensity:.7}));bowl.receiveShadow=true;
+ const angles=[];for(let i=0;i<144;i++){let t=i*TAU/144;if(Math.abs(Math.sin(t))<.94)angles.push(t)}batchRadial(g,angles.length,new T.BoxGeometry(.13,.075,.15),m.steel,i=>{let t=angles[i];return {position:[5.45*Math.cos(t),surfaceHeight(5.45)+.043,5.45*Math.sin(t)],rotation:[0,-t,0]}});
+ for(let t of [0,Math.PI])arcMesh(g,5.50,5.58,t-1.18,t+1.18,surfaceHeight(5.5)+.025,.055,m.brass,.005);
+ return bowl;
 }
