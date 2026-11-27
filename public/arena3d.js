@@ -448,7 +448,7 @@ function updateMotionLayer(obj,p,serverTime){
  layer.shadow.material.opacity=p.alive?.42/(1+height*.55):0;
  layer.shadow.scale.setScalar(1+Math.min(1.8,height*.45));
  if(!p.alive){layer.points.length=0;layer.trail.geometry.setDrawRange(0,0);return;}
- if(serverTime-layer.lastSample>.045){
+ if(serverTime<layer.lastSample){layer.points.length=0;layer.lastSample=-Infinity;}if(serverTime-layer.lastSample>.035){
   const prev=layer.points.at(-1);const dist=prev?Math.hypot(pos.x-prev.x,pos.z-prev.z):0;
   if(dist>2.8)layer.points.length=0; // Never draw a trail across a network teleport.
   if(!prev||dist>.045){layer.points.push({x:pos.x,z:pos.z,t:serverTime});if(layer.points.length>graphics.trail)layer.points.shift();}
@@ -464,7 +464,7 @@ function updateMotionLayer(obj,p,serverTime){
   arr[idx+3]=pt.x-px;arr[idx+4]=.095;arr[idx+5]=pt.z-pz;
  }
  layer.trail.geometry.attributes.position.needsUpdate=true;layer.trail.geometry.setDrawRange(0,(n-1)*6);
- layer.trail.visible=graphics.level!=='low'||p.charging||p.boost;
+ layer.trail.visible=!!p.alive;
 }
 function releaseMotionLayer(layer){
  scene.remove(layer.trail,layer.shadow);layer.trail.geometry.dispose();layer.trail.material.dispose();layer.shadow.material.dispose();
@@ -535,7 +535,7 @@ function loop(t){requestAnimationFrame(loop);const elapsed=Math.max(.001,(t-oldF
  myMarker.visible=!!(myActor?.alive&&myModel?.group.visible);
  if(myMarker.visible){myMarker.position.set(myModel.group.position.x,.16,myModel.group.position.z);myMarker.rotation.y=time*.4;}
 // The owner-only rotor silhouette follows the same coordinate as the physical top.
-myTopSilhouette.visible=myMarker.visible;
+myTopSilhouette.visible=myMarker.visible;myTopSilhouette.children.forEach(o=>{if(o.material)o.material.opacity=.22});
 if(myTopSilhouette.visible){myTopSilhouette.position.copy(myModel.group.position);myTopSilhouette.rotation.set(0,Number.isFinite(myActor?.spinPhase)?myActor.spinPhase:time*16,0);}
  forgeFx.update(dt,fighters.map(p=>({x:p.x/40,z:p.y/40,alive:p.alive,charge:p.charging?1:0,boost:p.boost?1:0,guard:p.countering?1:0,color:state.tops?.find(t=>t.id===p.top)?.accent||0xe5a456})));
  window.SPINBREAK_RENDER_DIAGNOSTICS={visualPipeline:'FORGE_SHARED_V11',theme:stageName,postprocessing:graphics.level==='high',effects:forgeFx.diagnostics,accretion:anomalyOverlay.children.some(o=>o.userData.accretion),serverFighters:fighters.length,models:models.size,
