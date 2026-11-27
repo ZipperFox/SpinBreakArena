@@ -1,0 +1,55 @@
+name: Forge Zero Visual Lab (isolated)
+on:
+  pull_request:
+    paths:
+      - 'labs/forge-zero/**'
+      - 'public/**'
+      - 'physics3d.js'
+      - 'server.js'
+      - 'scripts/test-nextgen.mjs'
+      - '.github/workflows/forge-zero-visual.yml'
+permissions:
+  contents: read
+jobs:
+  visual:
+    if: startsWith(github.head_ref, 'lab/forge-zero')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: labs/forge-zero
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - run: npm run check && node scripts/test-battle.mjs
+      - run: npx playwright install --with-deps chromium
+      - run: npm run capture
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: forge-zero-visual-captures
+          path: labs/forge-zero/captures/
+          retention-days: 7
+
+  multiplayer:
+    if: startsWith(github.head_ref, 'lab/forge-zero')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --omit=dev --no-audit --no-fund
+      - run: npm install --prefix labs/forge-zero --no-audit --no-fund
+      - run: cd labs/forge-zero && npx playwright install --with-deps chromium
+      - run: node labs/forge-zero/scripts/capture-multiplayer.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nextgen-multiplayer-captures
+          path: captures-nextgen/
+          retention-days: 7

@@ -32,7 +32,7 @@ async function main(){
   assert(renderer.includes(`${id}:{sky:`),'Unique environment mood '+id);
  }
  assert(renderer.includes('makeStageFloor(name)'),'No identical floor texture');
- assert(renderer.includes('stageScenery(name,hot,cyan)'),'Stage structures');
+ assert(renderer.includes('stageScenery(name,hot,cyan)')&&renderer.includes('buildArena(forgeMaterials)'),'Shared Forge structures and additional stage architecture');
  assert(renderer.includes('stageLighting(name)'),'Stage ambient colors');
  assert(renderer.includes('beyond the ring and the return lanes'),'Stage scenery must remain visually-only outside the ring');
  assert(fs.readFileSync('./server.js','utf8').includes("'.wav':'audio/wav'"),'Serve WAV with correct MIME');

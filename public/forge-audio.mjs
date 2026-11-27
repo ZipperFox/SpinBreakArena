@@ -1,0 +1,5 @@
+import {Sound} from './forge/audio.mjs';
+const sound=new Sound();let wanted=false,pending=null,fx=.5,music=.32;
+function set(){sound.levels(music,fx)}
+export const audioAdapter={enable(){wanted=true;pending=sound.enable().then(()=>{if(!wanted)sound.disable();set()}).catch(e=>{console.warn('Forge audio',e);wanted=false});return true},disable(){wanted=false;sound.disable()},ready(){return pending||Promise.resolve()},loadedCount(){return sound.diagnostics.decoded},setVolume(v){fx=v;set()},setMusic(v){music=v;set()},speed(v){sound.speed(v)},play(kind,detail={}){let mapped=({counter_success:'counter',counter_ready:'guard',anomaly_warning:'guard',anomaly_start:'hole',rail:'charge',return:'charge',win:'finish'})[kind]||kind;if(!['hit','wall','counter','charge','skill','ko','guard','start','finish','hole'].includes(mapped))return false;return sound.play(mapped,Math.min(1.8,Math.max(.16,(detail.amount||100)/135)),{...detail,x:(detail.x||0)/40,contactKey:kind+':'+(detail.id||'')});},get diagnostics(){return sound.diagnostics}};
+window.SPINBREAK_FORGE_AUDIO=audioAdapter;window.dispatchEvent(new Event('forge-audio-ready'));

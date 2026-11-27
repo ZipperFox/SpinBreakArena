@@ -1,0 +1,17 @@
+{
+  "name": "forge-zero-visual-lab",
+  "version": "0.8.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "check": "node --check src/main.mjs && node --check src/art.mjs && node --check src/battle.mjs && node --check src/audio.mjs && node --check src/combat-visuals.mjs && node --check src/rotor-physics.mjs && node --check src/rotor-spec.mjs && node --check src/mechanical-top.mjs",
+    "capture": "node scripts/capture.mjs"
+  },
+  "dependencies": {
+    "three": "0.180.0"
+  },
+  "devDependencies": {
+    "playwright": "1.56.1"
+  }
+}
